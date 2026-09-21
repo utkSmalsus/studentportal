@@ -17,6 +17,7 @@ import ProjectPage from './pages/ProjectPage';
 import PerformancePage from './pages/PerformancePage';
 import CertificatesPage from './pages/CertificatesPage';
 import ProfilePage from './pages/ProfilePage';
+import { course } from '../data/selectors';
 
 const StudentPortalShell: React.FC<IStudentPortalProps> = ({ userDisplayName }) => {
   const [route, setRoute] = useState<Route>({ view: 'home' });
@@ -55,7 +56,7 @@ const StudentPortalShell: React.FC<IStudentPortalProps> = ({ userDisplayName }) 
   };
 
   return (
-    <NavShell route={route} onNavigate={setRoute}>
+    <NavShell route={route} onNavigate={setRoute} userDisplayName={userDisplayName} courseTitle={course.title}>
       {renderPage()}
     </NavShell>
   );

@@ -1,11 +1,13 @@
 import * as React from 'react';
 import { useState } from 'react';
 import { Route, TopLevelView, topLevelFor } from './types';
+import { HomeIcon, MapIcon, CodeIcon, ClipboardIcon, RocketIcon, ChartIcon, AwardIcon, UserIcon, MenuIcon, CloseIcon } from '../ui/icons';
 
 interface NavItem {
   view: TopLevelView;
   label: string;
   route: Route;
+  icon: React.FC<{ className?: string }>;
 }
 
 interface NavGroup {
@@ -14,29 +16,31 @@ interface NavGroup {
 }
 
 const groups: NavGroup[] = [
-  { label: '', items: [{ view: 'home', label: 'Home', route: { view: 'home' } }] },
-  { label: 'Learning', items: [{ view: 'journey', label: 'Course Journey', route: { view: 'journey' } }] },
-  { label: 'Practice', items: [{ view: 'coding', label: 'Daily Coding', route: { view: 'coding' } }] },
+  { label: 'Overview', items: [{ view: 'home', label: 'Home', route: { view: 'home' }, icon: HomeIcon }] },
+  { label: 'Learning', items: [{ view: 'journey', label: 'Course Journey', route: { view: 'journey' }, icon: MapIcon }] },
+  { label: 'Practice', items: [{ view: 'coding', label: 'Daily Coding', route: { view: 'coding' }, icon: CodeIcon }] },
   {
-    label: 'Work',
+    label: 'Build',
     items: [
-      { view: 'tasks', label: 'Mini Tasks', route: { view: 'tasks' } },
-      { view: 'project', label: 'Major Project', route: { view: 'project' } },
+      { view: 'tasks', label: 'Mini Tasks', route: { view: 'tasks' }, icon: ClipboardIcon },
+      { view: 'project', label: 'Major Project', route: { view: 'project' }, icon: RocketIcon },
     ],
   },
   {
     label: 'Progress',
     items: [
-      { view: 'performance', label: 'Performance', route: { view: 'performance' } },
-      { view: 'certificates', label: 'Certificates', route: { view: 'certificates' } },
+      { view: 'performance', label: 'Performance', route: { view: 'performance' }, icon: ChartIcon },
+      { view: 'certificates', label: 'Certificates', route: { view: 'certificates' }, icon: AwardIcon },
     ],
   },
-  { label: 'Account', items: [{ view: 'profile', label: 'Profile', route: { view: 'profile' } }] },
+  { label: 'Account', items: [{ view: 'profile', label: 'Profile', route: { view: 'profile' }, icon: UserIcon }] },
 ];
 
-const NavShell: React.FC<{ route: Route; onNavigate: (r: Route) => void; children: React.ReactNode }> = ({
+const NavShell: React.FC<{ route: Route; onNavigate: (r: Route) => void; userDisplayName: string; courseTitle: string; children: React.ReactNode }> = ({
   route,
   onNavigate,
+  userDisplayName,
+  courseTitle,
   children,
 }) => {
   const active = topLevelFor(route);
@@ -50,21 +54,26 @@ const NavShell: React.FC<{ route: Route; onNavigate: (r: Route) => void; childre
   const navList = (
     <>
       {groups.map((group, gi) => (
-        <div key={gi} className="mb-5">
-          {group.label && <div className="px-2 mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-400">{group.label}</div>}
-          <ul>
-            {group.items.map((item) => (
-              <li key={item.view}>
-                <button
-                  onClick={() => navigate(item.route)}
-                  className={`w-full text-left px-2 py-1.5 rounded-md text-sm transition ${
-                    active === item.view ? 'bg-gray-900 text-white font-medium' : 'text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              </li>
-            ))}
+        <div key={gi} className="mb-6">
+          <div className="px-3 mb-2 text-[10.5px] font-bold uppercase tracking-widest text-slate-400">{group.label}</div>
+          <ul className="space-y-0.5">
+            {group.items.map((item) => {
+              const isActive = active === item.view;
+              const Icon = item.icon;
+              return (
+                <li key={item.view}>
+                  <button
+                    onClick={() => navigate(item.route)}
+                    className={`w-full flex items-center gap-2.5 text-left px-3 py-2 rounded-lg text-[13.5px] transition ${
+                      isActive ? 'bg-indigo-600 text-white font-semibold shadow-sm' : 'text-slate-600 hover:bg-slate-100 font-medium'
+                    }`}
+                  >
+                    <Icon className={`w-[17px] h-[17px] shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                    {item.label}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </div>
       ))}
@@ -72,24 +81,38 @@ const NavShell: React.FC<{ route: Route; onNavigate: (r: Route) => void; childre
   );
 
   return (
-    <div className="font-sans text-gray-900 bg-white min-h-[640px]">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 md:hidden">
-        <span className="text-sm font-semibold text-gray-900">Student Portal</span>
-        <button
-          onClick={() => setMobileOpen((v) => !v)}
-          className="text-sm font-medium text-gray-600 border border-gray-200 rounded-md px-3 py-1.5"
-          aria-expanded={mobileOpen}
-        >
-          {mobileOpen ? 'Close' : 'Menu'}
+    <div className="font-sans text-slate-900 bg-slate-50 min-h-[720px]">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-white lg:hidden">
+        <span className="text-[15px] font-bold text-slate-900">Student Portal</span>
+        <button onClick={() => setMobileOpen((v) => !v)} className="text-slate-600 border border-slate-200 rounded-md p-1.5" aria-expanded={mobileOpen}>
+          {mobileOpen ? <CloseIcon className="w-5 h-5" /> : <MenuIcon className="w-5 h-5" />}
         </button>
       </div>
 
-      <div className="flex flex-col md:flex-row">
-        <nav className={`w-full md:w-56 shrink-0 border-b md:border-b-0 md:border-r border-gray-100 py-4 px-4 md:py-6 ${mobileOpen ? 'block' : 'hidden md:block'}`}>
-          <div className="hidden md:block px-2 pb-6 mb-2 text-sm font-semibold text-gray-900">Student Portal</div>
-          {navList}
+      <div className="flex lg:min-h-[720px]">
+        <nav
+          className={`w-full lg:w-[248px] shrink-0 bg-white border-b lg:border-b-0 lg:border-r border-slate-200 flex-col ${
+            mobileOpen ? 'flex' : 'hidden lg:flex'
+          }`}
+        >
+          <div className="hidden lg:flex items-center gap-2.5 px-5 h-16 border-b border-slate-100">
+            <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-sm">S</div>
+            <span className="text-[15px] font-bold text-slate-900">Student Portal</span>
+          </div>
+          <div className="flex-1 overflow-auto px-3 pt-4 lg:pt-5">{navList}</div>
+          <div className="hidden lg:flex items-center gap-2.5 px-4 py-4 border-t border-slate-100">
+            <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold shrink-0">
+              {userDisplayName.charAt(0)}
+            </div>
+            <div className="min-w-0">
+              <div className="text-[13px] font-semibold text-slate-900 truncate">{userDisplayName.split(' ')[0]}</div>
+              <div className="text-[11px] text-slate-400 truncate">{courseTitle}</div>
+            </div>
+          </div>
         </nav>
-        <main className="flex-1 px-5 md:px-8 py-6 md:py-7 overflow-auto max-w-4xl">{children}</main>
+        <main className="flex-1 min-w-0 px-5 sm:px-8 lg:px-10 py-7 lg:py-9">
+          <div className="max-w-[1280px] mx-auto">{children}</div>
+        </main>
       </div>
     </div>
   );

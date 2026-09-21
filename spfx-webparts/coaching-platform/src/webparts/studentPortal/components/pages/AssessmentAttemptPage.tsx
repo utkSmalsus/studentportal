@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useState } from 'react';
 import { Route } from '../../navigation/types';
-import { PrimaryButton, SecondaryButton, ProgressBar, EmptyState } from '../../ui/Primitives';
+import { Card, PrimaryButton, SecondaryButton, ProgressBar, EmptyState } from '../../ui/Primitives';
 import { useAppState } from '../../state/AppStateContext';
 import { getAssessmentById } from '../../data/selectors';
 
@@ -30,36 +30,44 @@ const AssessmentAttemptPage: React.FC<{ assessmentId: string; onNavigate: (r: Ro
   };
 
   return (
-    <div>
-      <div className="flex items-center justify-between text-sm text-gray-500 mb-2">
-        <span>
+    <div className="max-w-2xl mx-auto">
+      <div className="flex items-center justify-between text-sm text-slate-500 mb-2.5">
+        <span className="font-semibold text-slate-700">
           Question {index + 1} of {a.questions.length}
         </span>
         <span>{answeredCount} answered</span>
       </div>
       <ProgressBar percent={((index + 1) / a.questions.length) * 100} color="blue" />
 
-      <h1 className="text-xl font-medium text-gray-900 mt-6">{question.text}</h1>
+      <Card className="mt-6">
+        <h1 className="text-lg font-bold text-slate-900">{question.text}</h1>
 
-      <div className="mt-4 space-y-2">
-        {question.options.map((opt, i) => {
-          const selected = answers[question.id] === i;
-          return (
-            <button
-              key={i}
-              onClick={() => selectAnswer(i)}
-              className={`w-full text-left px-4 py-2.5 rounded-md border text-sm transition ${
-                selected ? 'border-blue-500 bg-blue-50 text-blue-800 font-medium' : 'border-gray-200 text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <span className={`inline-block w-4 h-4 rounded-full border mr-2 align-middle ${selected ? 'border-blue-500 bg-blue-500' : 'border-gray-300'}`} />
-              {opt}
-            </button>
-          );
-        })}
-      </div>
+        <div className="mt-5 space-y-2.5">
+          {question.options.map((opt, i) => {
+            const selected = answers[question.id] === i;
+            return (
+              <button
+                key={i}
+                onClick={() => selectAnswer(i)}
+                className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-lg border text-sm transition ${
+                  selected ? 'border-indigo-500 bg-indigo-50 text-indigo-900 font-semibold' : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <span
+                  className={`w-[18px] h-[18px] rounded-full border-2 shrink-0 flex items-center justify-center ${
+                    selected ? 'border-indigo-500' : 'border-slate-300'
+                  }`}
+                >
+                  {selected && <span className="w-2 h-2 rounded-full bg-indigo-500" />}
+                </span>
+                {opt}
+              </button>
+            );
+          })}
+        </div>
+      </Card>
 
-      <div className="flex items-center justify-between mt-8">
+      <div className="flex items-center justify-between mt-6">
         <SecondaryButton onClick={() => setIndex((i) => Math.max(0, i - 1))} disabled={index === 0}>
           Previous
         </SecondaryButton>
@@ -72,17 +80,27 @@ const AssessmentAttemptPage: React.FC<{ assessmentId: string; onNavigate: (r: Ro
         )}
       </div>
 
-      <div className="flex gap-1.5 mt-6">
-        {a.questions.map((q, i) => (
-          <button
-            key={q.id}
-            onClick={() => setIndex(i)}
-            className={`w-2.5 h-2.5 rounded-full ${
-              i === index ? 'bg-blue-600' : answers[q.id] !== undefined ? 'bg-emerald-400' : 'bg-gray-200'
-            }`}
-            aria-label={`Go to question ${i + 1}`}
-          />
-        ))}
+      <div className="flex flex-wrap gap-2 mt-7 justify-center">
+        {a.questions.map((q, i) => {
+          const isAnswered = answers[q.id] !== undefined;
+          const isCurrent = i === index;
+          return (
+            <button
+              key={q.id}
+              onClick={() => setIndex(i)}
+              className={`w-8 h-8 rounded-full text-xs font-bold flex items-center justify-center transition ${
+                isCurrent
+                  ? 'bg-indigo-600 text-white ring-4 ring-indigo-100'
+                  : isAnswered
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : 'bg-slate-100 text-slate-400'
+              }`}
+              aria-label={`Go to question ${i + 1}`}
+            >
+              {isAnswered && !isCurrent ? '✓' : i + 1}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

@@ -1,33 +1,35 @@
 import * as React from 'react';
-import { Divider } from '../../ui/Primitives';
+import { Card, PageHeader } from '../../ui/Primitives';
 import { profile } from '../../data/mockData';
 
 const Row: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <div className="flex justify-between max-w-sm">
-    <dt className="text-gray-400">{label}</dt>
-    <dd className="text-gray-800 font-medium">{value}</dd>
+  <div className="flex justify-between">
+    <dt className="text-slate-400">{label}</dt>
+    <dd className="text-slate-800 font-semibold">{value}</dd>
   </div>
 );
 
 const ProfilePage: React.FC<{ userDisplayName: string }> = ({ userDisplayName }) => (
   <div>
-    <div className="flex items-center gap-4">
-      <div className="w-14 h-14 rounded-full bg-gray-900 text-white flex items-center justify-center text-lg font-semibold">
+    <PageHeader eyebrow="Account" title="Profile" />
+
+    <div className="flex items-center gap-4 mb-6">
+      <div className="w-16 h-16 rounded-full bg-slate-900 text-white flex items-center justify-center text-xl font-bold">
         {(userDisplayName || profile.name).charAt(0)}
       </div>
       <div>
-        <h1 className="text-xl font-semibold text-gray-900">{userDisplayName || profile.name}</h1>
-        <p className="text-sm text-gray-500">{profile.batch}</p>
+        <div className="text-lg font-bold text-slate-900">{userDisplayName || profile.name}</div>
+        <div className="text-sm text-slate-500">{profile.batch}</div>
       </div>
     </div>
 
-    <Divider />
-
-    <dl className="text-sm space-y-2">
-      <Row label="Course" value={profile.course} />
-      <Row label="Batch" value={profile.batch} />
-      <Row label="Joined" value={profile.joiningDate} />
-    </dl>
+    <Card className="max-w-md">
+      <dl className="text-sm space-y-3">
+        <Row label="Course" value={profile.course} />
+        <Row label="Batch" value={profile.batch} />
+        <Row label="Joined" value={profile.joiningDate} />
+      </dl>
+    </Card>
   </div>
 );
 
