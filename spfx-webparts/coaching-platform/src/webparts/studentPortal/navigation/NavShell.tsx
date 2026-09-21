@@ -36,13 +36,14 @@ const groups: NavGroup[] = [
   { label: 'Account', items: [{ view: 'profile', label: 'Profile', route: { view: 'profile' }, icon: UserIcon }] },
 ];
 
-const NavShell: React.FC<{ route: Route; onNavigate: (r: Route) => void; userDisplayName: string; courseTitle: string; children: React.ReactNode }> = ({
-  route,
-  onNavigate,
-  userDisplayName,
-  courseTitle,
-  children,
-}) => {
+const NavShell: React.FC<{
+  route: Route;
+  onNavigate: (r: Route) => void;
+  userDisplayName: string;
+  courseTitle: string;
+  onOpenAdmin?: () => void;
+  children: React.ReactNode;
+}> = ({ route, onNavigate, userDisplayName, courseTitle, onOpenAdmin, children }) => {
   const active = topLevelFor(route);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -100,6 +101,17 @@ const NavShell: React.FC<{ route: Route; onNavigate: (r: Route) => void; userDis
             <span className="text-[15px] font-bold text-slate-900">Student Portal</span>
           </div>
           <div className="flex-1 overflow-auto px-3 pt-4 lg:pt-5">{navList}</div>
+          {onOpenAdmin && (
+            <div className="px-3 pb-2">
+              <button
+                onClick={onOpenAdmin}
+                className="w-full flex items-center gap-2.5 text-left px-3 py-2 rounded-lg text-[13px] font-semibold text-slate-500 hover:bg-slate-100"
+              >
+                <span className="w-[17px] h-[17px] rounded bg-slate-200 text-slate-500 flex items-center justify-center text-[10px] font-bold shrink-0">A</span>
+                Admin Panel
+              </button>
+            </div>
+          )}
           <div className="hidden lg:flex items-center gap-2.5 px-4 py-4 border-t border-slate-100">
             <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold shrink-0">
               {userDisplayName.charAt(0)}

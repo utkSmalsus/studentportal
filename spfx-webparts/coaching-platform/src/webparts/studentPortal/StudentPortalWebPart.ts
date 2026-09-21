@@ -9,7 +9,7 @@ import { BaseClientSideWebPart } from '@microsoft/sp-webpart-base';
 import { IReadonlyTheme } from '@microsoft/sp-component-base';
 
 import * as strings from 'StudentPortalWebPartStrings';
-import StudentPortal from './components/StudentPortal';
+import AppRoot from './components/AppRoot';
 import { IStudentPortalProps } from './components/IStudentPortalProps';
 import { tailwindCss } from './styles/tailwindCss';
 
@@ -50,7 +50,7 @@ export default class StudentPortalWebPart extends BaseClientSideWebPart<IStudent
 
   public render(): void {
     const element: React.ReactElement<IStudentPortalProps> = React.createElement(
-      StudentPortal,
+      AppRoot,
       {
         description: this.properties.description,
         isDarkTheme: this._isDarkTheme,

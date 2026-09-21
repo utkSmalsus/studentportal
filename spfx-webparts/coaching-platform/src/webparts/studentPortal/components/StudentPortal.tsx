@@ -2,6 +2,7 @@ import * as React from 'react';
 import { useState } from 'react';
 import type { IStudentPortalProps } from './IStudentPortalProps';
 import { AppStateProvider } from '../state/AppStateContext';
+import { useAdminStoreVersion } from '../admin/hooks';
 import NavShell from '../navigation/NavShell';
 import { Route } from '../navigation/types';
 import HomePage from './pages/HomePage';
@@ -22,7 +23,8 @@ import CertificatesPage from './pages/CertificatesPage';
 import ProfilePage from './pages/ProfilePage';
 import { course } from '../data/selectors';
 
-const StudentPortalShell: React.FC<IStudentPortalProps> = ({ userDisplayName }) => {
+export const StudentPortalShell: React.FC<IStudentPortalProps & { onOpenAdmin?: () => void }> = ({ userDisplayName, onOpenAdmin }) => {
+  useAdminStoreVersion();
   const [route, setRoute] = useState<Route>({ view: 'home' });
 
   const renderPage = (): React.ReactElement | null => {
@@ -65,7 +67,7 @@ const StudentPortalShell: React.FC<IStudentPortalProps> = ({ userDisplayName }) 
   };
 
   return (
-    <NavShell route={route} onNavigate={setRoute} userDisplayName={userDisplayName} courseTitle={course.title}>
+    <NavShell route={route} onNavigate={setRoute} userDisplayName={userDisplayName} courseTitle={course.title} onOpenAdmin={onOpenAdmin}>
       {renderPage()}
     </NavShell>
   );

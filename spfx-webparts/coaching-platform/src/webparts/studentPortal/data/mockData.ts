@@ -379,7 +379,7 @@ export { topicTests };
 
 export const moduleTests: ModuleTestDef[] = [
   {
-    id: 'test-css', moduleId: 'css', title: 'HTML & CSS Module Test', timeLimitMinutes: 15, passingScorePercent: 70,
+    id: 'test-css', moduleId: 'css', title: 'HTML & CSS Module Test', timeLimitMinutes: 15, passingScorePercent: 70, attemptsAllowed: 2,
     questions: [
       { id: 'tcss1', text: 'Which value of box-sizing makes width include padding and border?', options: ['border-box', 'content-box', 'padding-box', 'inherit'], correctIndex: 0 },
       { id: 'tcss2', text: 'Which property distributes space between flex items?', options: ['justify-content', 'align-items', 'flex-direction', 'gap'], correctIndex: 0 },
@@ -389,7 +389,7 @@ export const moduleTests: ModuleTestDef[] = [
     ],
   },
   {
-    id: 'test-js-basics', moduleId: 'js-basics', title: 'JavaScript Basics Module Test', timeLimitMinutes: 15, passingScorePercent: 70,
+    id: 'test-js-basics', moduleId: 'js-basics', title: 'JavaScript Basics Module Test', timeLimitMinutes: 15, passingScorePercent: 70, attemptsAllowed: 2,
     questions: [
       { id: 'tjb1', text: 'Which keyword should you default to when declaring a variable that will not be reassigned?', options: ['const', 'var', 'let', 'static'], correctIndex: 0 },
       { id: 'tjb2', text: 'What does `typeof "hello"` return?', options: ['"string"', '"text"', '"char"', '"object"'], correctIndex: 0 },
@@ -399,7 +399,7 @@ export const moduleTests: ModuleTestDef[] = [
     ],
   },
   {
-    id: 'test-js-intermediate', moduleId: 'js-intermediate', title: 'JavaScript Intermediate Module Test', timeLimitMinutes: 18, passingScorePercent: 70,
+    id: 'test-js-intermediate', moduleId: 'js-intermediate', title: 'JavaScript Intermediate Module Test', timeLimitMinutes: 18, passingScorePercent: 70, attemptsAllowed: 2,
     questions: [
       { id: 'tji1', text: 'Which array method does NOT mutate the original array?', options: ['map', 'push', 'splice', 'sort'], correctIndex: 0 },
       { id: 'tji2', text: 'What does object destructuring let you do?', options: ['Extract properties into variables directly', 'Delete an object', 'Clone a function', 'Convert an object to JSON'], correctIndex: 0 },
@@ -409,7 +409,7 @@ export const moduleTests: ModuleTestDef[] = [
     ],
   },
   {
-    id: 'test-js-advanced', moduleId: 'js-advanced', title: 'JavaScript Advanced Module Test', timeLimitMinutes: 18, passingScorePercent: 70,
+    id: 'test-js-advanced', moduleId: 'js-advanced', title: 'JavaScript Advanced Module Test', timeLimitMinutes: 18, passingScorePercent: 70, attemptsAllowed: 2,
     questions: [
       { id: 'tja1', text: 'A closure gives a function access to:', options: ["Its outer function's scope even after that function has returned", 'Only global variables', 'The DOM directly', 'Other files automatically'], correctIndex: 0 },
       { id: 'tja2', text: 'Which runs first: synchronous code, a microtask, or a macrotask?', options: ['Synchronous code', 'Microtask', 'Macrotask', 'They always run in parallel'], correctIndex: 0 },
@@ -419,7 +419,7 @@ export const moduleTests: ModuleTestDef[] = [
     ],
   },
   {
-    id: 'test-react', moduleId: 'react', title: 'React Module Test', timeLimitMinutes: 15, passingScorePercent: 70,
+    id: 'test-react', moduleId: 'react', title: 'React Module Test', timeLimitMinutes: 15, passingScorePercent: 70, attemptsAllowed: 2,
     questions: [
       { id: 'tr1', text: 'Props are best described as:', options: ['Read-only data passed from a parent component', 'Mutable local state', 'Global variables', 'CSS class names'], correctIndex: 0 },
       { id: 'tr2', text: 'What triggers a React component to re-render?', options: ['A state or prop change', 'Scrolling the page', 'Refreshing CSS', 'Opening dev tools'], correctIndex: 0 },
@@ -429,7 +429,7 @@ export const moduleTests: ModuleTestDef[] = [
     ],
   },
   {
-    id: 'test-react-hooks', moduleId: 'react-hooks', title: 'React Hooks Module Test', timeLimitMinutes: 18, passingScorePercent: 70,
+    id: 'test-react-hooks', moduleId: 'react-hooks', title: 'React Hooks Module Test', timeLimitMinutes: 18, passingScorePercent: 70, attemptsAllowed: 2,
     questions: [
       { id: 'trh1', text: 'useEffect with an empty dependency array `[]` runs:', options: ['Once, after the first render', 'On every render', 'Never', 'Only on unmount'], correctIndex: 0 },
       { id: 'trh2', text: 'A custom hook name must start with:', options: ['use', 'get', 'hook', 'with'], correctIndex: 0 },
@@ -439,7 +439,7 @@ export const moduleTests: ModuleTestDef[] = [
     ],
   },
   {
-    id: 'test-node', moduleId: 'node', title: 'Node.js Module Test', timeLimitMinutes: 20, passingScorePercent: 70,
+    id: 'test-node', moduleId: 'node', title: 'Node.js Module Test', timeLimitMinutes: 20, passingScorePercent: 70, attemptsAllowed: 2,
     questions: [
       { id: 'tn1', text: 'Which keyword imports a module in CommonJS?', options: ['require', 'import', 'include', 'using'], correctIndex: 0 },
       { id: 'tn2', text: 'Which fs method does NOT block the event loop?', options: ['fs.readFile', 'fs.readFileSync', 'fs.statSync', 'fs.existsSync'], correctIndex: 0 },

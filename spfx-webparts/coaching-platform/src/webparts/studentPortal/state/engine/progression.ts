@@ -7,9 +7,15 @@
 // Gate chain per module: Topic -> Topic Test -> Daily Coding (gate) -> next Topic ->
 // ... -> all Topics done -> Module Test -> Assessment -> Module Complete -> next
 // Module unlocked.
-import { ModuleDef, Course, TopicDef, CodingQuestionDef } from '../../data/types';
+import { ModuleDef, Course, TopicDef, CodingQuestionDef, ProgressionRules, DEFAULT_PROGRESSION_RULES } from '../../data/types';
 import { StudentProgressState, PracticeStatus, TopicProgressEntry } from '../types';
 import { miniTasks, assessments, majorProject, moduleTests, codingQuestions } from '../../data/mockData';
+
+// Admin-configurable gate chain for a module (Curriculum Builder). A module
+// with no override uses the platform default — see data/types.ts.
+export function getModuleRules(module: ModuleDef): ProgressionRules {
+  return module.progressionRules || DEFAULT_PROGRESSION_RULES;
+}
 
 export function getPracticeStatus(module: ModuleDef, practiceId: string, progress: StudentProgressState): PracticeStatus {
   if (progress.practiceStatus[practiceId] === 'completed') return 'completed';
@@ -57,27 +63,36 @@ export function isTopicTestPassed(topicId: string, progress: StudentProgressStat
   return !!progress.topics[topicId]?.testAttempts.some((a) => a.passed);
 }
 
-export const isTopicCompleted = isTopicTestPassed;
+// Rule-aware "is this topic done enough to advance past" check — used for
+// gating. If a module's rules don't require a topic test, watching the video/
+// content is enough. `isTopicTestPassed` above stays a literal, rule-independent
+// fact ("was the test passed") for display purposes (status pills, counts).
+export function isTopicCompleted(module: ModuleDef, topicId: string, progress: StudentProgressState): boolean {
+  const rules = getModuleRules(module);
+  if (!rules.requireTopicTest) return getTopicProgress(topicId, progress).contentViewed || isTopicTestPassed(topicId, progress);
+  return isTopicTestPassed(topicId, progress);
+}
 
 export function getTopicProgress(topicId: string, progress: StudentProgressState): TopicProgressEntry {
   return progress.topics[topicId] || { contentViewed: false, testAttempts: [] };
 }
 
-// A topic is unlocked once every topic before it (in module order) has a passed
-// test. The daily coding gate blocks ADVANCING past a completed topic, not opening
-// the first not-yet-done one, so a student can always see what's next.
+// A topic is unlocked once every topic before it (in module order) is complete
+// per the module's own rules. The daily coding gate blocks ADVANCING past a
+// completed topic, not opening the first not-yet-done one, so a student can
+// always see what's next.
 export function isTopicUnlocked(module: ModuleDef, topicId: string, progress: StudentProgressState): boolean {
   const index = module.topics.findIndex((t) => t.id === topicId);
   if (index <= 0) return true;
-  return module.topics.slice(0, index).every((t) => isTopicTestPassed(t.id, progress));
+  return module.topics.slice(0, index).every((t) => isTopicCompleted(module, t.id, progress));
 }
 
 export type TopicUiStatus = 'locked' | 'completed' | 'current' | 'upcoming';
 
 export function getTopicStatus(module: ModuleDef, topicId: string, progress: StudentProgressState): TopicUiStatus {
-  if (isTopicTestPassed(topicId, progress)) return 'completed';
+  if (isTopicCompleted(module, topicId, progress)) return 'completed';
   if (!isTopicUnlocked(module, topicId, progress)) return 'locked';
-  const firstOpen = module.topics.find((t) => !isTopicTestPassed(t.id, progress));
+  const firstOpen = module.topics.find((t) => !isTopicCompleted(module, t.id, progress));
   return firstOpen?.id === topicId ? 'current' : 'upcoming';
 }
 
@@ -91,18 +106,18 @@ export function canCompleteTopic(module: ModuleDef, topicId: string, progress: S
   return isTopicUnlocked(module, topicId, progress);
 }
 
-// Once a topic's test is passed, can the student move to the next topic yet, or is
-// today's Daily Coding challenge blocking them?
-export function canAdvanceFromTopic(topicId: string, progress: StudentProgressState): boolean {
-  return isTopicTestPassed(topicId, progress) && isDailyCodingGateSatisfied(progress);
+// Once a topic is done, can the student move to the next topic yet, or is
+// today's Daily Coding challenge (if this module's rules require it) blocking them?
+export function canAdvanceFromTopic(module: ModuleDef, topicId: string, progress: StudentProgressState): boolean {
+  const rules = getModuleRules(module);
+  const dailyOk = !rules.requireDailyCoding || isDailyCodingGateSatisfied(progress);
+  return isTopicCompleted(module, topicId, progress) && dailyOk;
 }
 
-export function canAdvanceToNextTopic(topicId: string, progress: StudentProgressState): boolean {
-  return canAdvanceFromTopic(topicId, progress);
-}
+export const canAdvanceToNextTopic = canAdvanceFromTopic;
 
 export function areAllTopicsComplete(module: ModuleDef, progress: StudentProgressState): boolean {
-  return module.topics.every((t) => isTopicTestPassed(t.id, progress));
+  return module.topics.every((t) => isTopicCompleted(module, t.id, progress));
 }
 
 // ---- Module Test ---------------------------------------------------------------
@@ -113,16 +128,20 @@ export function isModuleTestPassed(moduleTestId: string, progress: StudentProgre
 
 export function canStartModuleTest(module: ModuleDef, progress: StudentProgressState): boolean {
   if (!module.moduleTestId) return false;
-  return areAllTopicsComplete(module, progress) && isDailyCodingGateSatisfied(progress);
+  const rules = getModuleRules(module);
+  const dailyOk = !rules.requireDailyCoding || isDailyCodingGateSatisfied(progress);
+  return areAllTopicsComplete(module, progress) && dailyOk;
 }
 
 // ---- Assessment ------------------------------------------------------------------
-// Gated by the Module Test when the module has one; otherwise falls back to "all
-// topics complete", same as before Module Tests existed.
+// Gated by the Module Test when the module has one AND requires it; otherwise
+// falls back to "all topics complete".
 
 export function canStartAssessment(module: ModuleDef, progress: StudentProgressState): boolean {
-  if (module.moduleTestId) return isModuleTestPassed(module.moduleTestId, progress);
-  return areAllTopicsComplete(module, progress) && isDailyCodingGateSatisfied(progress);
+  const rules = getModuleRules(module);
+  const dailyOk = !rules.requireDailyCoding || isDailyCodingGateSatisfied(progress);
+  if (module.moduleTestId && rules.requireModuleTest) return isModuleTestPassed(module.moduleTestId, progress);
+  return areAllTopicsComplete(module, progress) && dailyOk;
 }
 
 export const isAssessmentUnlocked = canStartAssessment;
@@ -130,22 +149,24 @@ export const isAssessmentUnlocked = canStartAssessment;
 // Human-readable reason a locked topic/module test/assessment isn't available yet —
 // used everywhere the UI needs to explain a lock, not just show a padlock icon.
 export function getLockReason(module: ModuleDef, target: 'topic' | 'moduleTest' | 'assessment', progress: StudentProgressState, topic?: TopicDef): string {
+  const rules = getModuleRules(module);
+  const dailyReason = 'Complete today\'s Daily Coding challenge before continuing your learning journey.';
   if (target === 'topic' && topic) {
     const index = module.topics.findIndex((t) => t.id === topic.id);
     const prev = module.topics[index - 1];
-    if (prev && !isTopicTestPassed(prev.id, progress)) return `Pass the "${prev.title}" topic test to continue.`;
-    if (prev && !isDailyCodingGateSatisfied(progress)) return 'Complete today\'s Daily Coding challenge before continuing your learning journey.';
+    if (prev && !isTopicCompleted(module, prev.id, progress)) return `Pass the "${prev.title}" topic test to continue.`;
+    if (prev && rules.requireDailyCoding && !isDailyCodingGateSatisfied(progress)) return dailyReason;
     return `Complete the earlier topics in ${module.title} first.`;
   }
   if (target === 'moduleTest') {
     if (!areAllTopicsComplete(module, progress)) return `Complete all ${module.title} topics to unlock the Module Test.`;
-    if (!isDailyCodingGateSatisfied(progress)) return 'Complete today\'s Daily Coding challenge before continuing your learning journey.';
+    if (rules.requireDailyCoding && !isDailyCodingGateSatisfied(progress)) return dailyReason;
     return 'Module Test is locked.';
   }
   // assessment
-  if (module.moduleTestId) return `Pass the Module Test to unlock the Assessment.`;
+  if (module.moduleTestId && rules.requireModuleTest) return `Pass the Module Test to unlock the Assessment.`;
   if (!areAllTopicsComplete(module, progress)) return `Complete all ${module.title} topics to unlock the Assessment.`;
-  return 'Complete today\'s Daily Coding challenge before continuing your learning journey.';
+  return dailyReason;
 }
 
 export function assessmentLockedReason(module: ModuleDef, progress: StudentProgressState): string {
@@ -164,11 +185,12 @@ export function isModuleComplete(module: ModuleDef, progress: StudentProgressSta
   if (module.id === majorProject.moduleId) {
     return majorProject.milestones.every((m) => progress.project.milestoneStatus[m.id] === 'completed');
   }
+  const rules = getModuleRules(module);
   const topicsDone = areAllTopicsComplete(module, progress);
   const practiceDone = module.practice.every((p) => isPracticeComplete(p.id, progress));
-  const taskDone = !module.miniTaskId || isMiniTaskComplete(module.miniTaskId, progress);
-  const moduleTestDone = !module.moduleTestId || isModuleTestPassed(module.moduleTestId, progress);
-  const assessmentDone = !module.assessmentId || isAssessmentComplete(module.assessmentId, progress);
+  const taskDone = !rules.requireMiniTask || !module.miniTaskId || isMiniTaskComplete(module.miniTaskId, progress);
+  const moduleTestDone = !rules.requireModuleTest || !module.moduleTestId || isModuleTestPassed(module.moduleTestId, progress);
+  const assessmentDone = !rules.requireAssessment || !module.assessmentId || isAssessmentComplete(module.assessmentId, progress);
   return topicsDone && practiceDone && taskDone && moduleTestDone && assessmentDone;
 }
 
@@ -238,24 +260,27 @@ export interface NextAction {
 // topic that's blocked from advancing surfaces as a dailyGate action, not silently
 // skipped.
 export function nextModuleAction(module: ModuleDef, progress: StudentProgressState): NextAction | undefined {
-  const nextTopic = module.topics.find((t) => !isTopicTestPassed(t.id, progress));
+  const rules = getModuleRules(module);
+  const dailyOk = !rules.requireDailyCoding || isDailyCodingGateSatisfied(progress);
+
+  const nextTopic = module.topics.find((t) => !isTopicCompleted(module, t.id, progress));
   if (nextTopic) {
     const index = module.topics.findIndex((t) => t.id === nextTopic.id);
     const prevTopic = module.topics[index - 1];
-    if (prevTopic && !isDailyCodingGateSatisfied(progress)) {
+    if (prevTopic && !dailyOk) {
       return { kind: 'dailyGate', title: 'Daily Coding Required', meta: "Complete today's coding challenge to continue" };
     }
     return { kind: 'topic', title: nextTopic.title, meta: `~${nextTopic.estimatedMinutes} min`, topicId: nextTopic.id };
   }
 
-  if (!isDailyCodingGateSatisfied(progress) && module.topics.length > 0) {
+  if (!dailyOk && module.topics.length > 0) {
     return { kind: 'dailyGate', title: 'Daily Coding Required', meta: "Complete today's coding challenge to continue" };
   }
 
   const nextPractice = module.practice.find((p) => !isPracticeComplete(p.id, progress));
   if (nextPractice) return { kind: 'practice', title: nextPractice.title, meta: `~${nextPractice.estimatedMinutes} min` };
 
-  if (module.miniTaskId) {
+  if (rules.requireMiniTask && module.miniTaskId) {
     const task = miniTasks.find((t) => t.id === module.miniTaskId);
     const entry = progress.miniTasks[module.miniTaskId];
     if (task && entry?.status !== 'Passed') {
@@ -263,14 +288,14 @@ export function nextModuleAction(module: ModuleDef, progress: StudentProgressSta
     }
   }
 
-  if (module.moduleTestId) {
+  if (rules.requireModuleTest && module.moduleTestId) {
     const test = moduleTests.find((t) => t.id === module.moduleTestId);
     if (test && !isModuleTestPassed(module.moduleTestId, progress)) {
       return { kind: 'moduleTest', title: test.title, meta: `${test.questions.length} questions` };
     }
   }
 
-  if (module.assessmentId) {
+  if (rules.requireAssessment && module.assessmentId) {
     const assessment = assessments.find((a) => a.id === module.assessmentId);
     if (assessment && !isAssessmentComplete(module.assessmentId, progress)) {
       return { kind: 'assessment', title: assessment.title, meta: `${assessment.questions.length} questions` };

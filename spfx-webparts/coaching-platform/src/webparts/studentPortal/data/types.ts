@@ -61,8 +61,35 @@ export interface ModuleTestDef {
   title: string;
   timeLimitMinutes: number;
   passingScorePercent: number;
+  attemptsAllowed: number;
   questions: TopicTestQuestionDef[];
 }
+
+// Which gates a module's own progression chain actually enforces, and at what
+// passing bar. Admin-configurable per module (Curriculum Builder); the engine
+// reads this instead of assuming every gate always applies. A module without an
+// explicit override falls back to DEFAULT_PROGRESSION_RULES.
+export interface ProgressionRules {
+  requireTopicTest: boolean;
+  requireDailyCoding: boolean;
+  requireMiniTask: boolean;
+  requireModuleTest: boolean;
+  requireAssessment: boolean;
+  topicTestPassingScore: number;
+  moduleTestPassingScore: number;
+  assessmentPassingScore: number;
+}
+
+export const DEFAULT_PROGRESSION_RULES: ProgressionRules = {
+  requireTopicTest: true,
+  requireDailyCoding: true,
+  requireMiniTask: true,
+  requireModuleTest: true,
+  requireAssessment: true,
+  topicTestPassingScore: 70,
+  moduleTestPassingScore: 70,
+  assessmentPassingScore: 60,
+};
 
 export interface ModuleDef {
   id: string;
@@ -78,6 +105,8 @@ export interface ModuleDef {
   // A module with no prerequisite is unlocked from day one. Everything else stays
   // locked until the engine confirms the prerequisite module is complete.
   prerequisiteModuleId?: string;
+  // Admin-configurable gate chain for this module. Undefined = DEFAULT_PROGRESSION_RULES.
+  progressionRules?: ProgressionRules;
 }
 
 export interface Course {

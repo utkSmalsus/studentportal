@@ -5,7 +5,7 @@
 // without a page refresh.
 import * as React from 'react';
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef } from 'react';
-import { StudentProgressState, NotificationItem, MiniTaskSubmissionVersion, QuizAttemptRecord } from './types';
+import { StudentProgressState, NotificationItem, MiniTaskSubmissionVersion, QuizAttemptRecord, MiniTaskEvaluation } from './types';
 import { createInitialProgressState } from './initialState';
 import { evaluateCodingSubmission } from './engine/codingEvaluator';
 import { generateMiniTaskEvaluation } from './engine/miniTaskEvaluator';
@@ -21,6 +21,7 @@ type Action =
   | { type: 'RECORD_CODING_ATTEMPT'; questionId: string; code: string }
   | { type: 'SUBMIT_MINI_TASK'; taskId: string; githubUrl: string; liveUrl: string; notes: string }
   | { type: 'EVALUATE_MINI_TASK'; taskId: string; version: number }
+  | { type: 'ADMIN_EVALUATE_MINI_TASK'; taskId: string; version: number; evaluation: MiniTaskEvaluation }
   | { type: 'RECORD_ASSESSMENT_ATTEMPT'; assessmentId: string; answers: Record<string, number> }
   | { type: 'ADVANCE_MILESTONE'; milestoneId: string; nextMilestoneId?: string }
   | { type: 'SUBMIT_PROJECT'; githubUrl: string; liveUrl: string; documentationUrl: string };
@@ -132,6 +133,27 @@ function reducer(state: StudentProgressState, action: Action): StudentProgressSt
       };
     }
 
+    case 'ADMIN_EVALUATE_MINI_TASK': {
+      const task = miniTasks.find((t) => t.id === action.taskId);
+      const entry = state.miniTasks[action.taskId];
+      if (!task || !entry) return state;
+      const versionIndex = entry.versions.findIndex((v) => v.version === action.version);
+      if (versionIndex === -1) return state;
+      const versions = entry.versions.map((v, i) => (i === versionIndex ? { ...v, evaluation: action.evaluation } : v));
+      const notifications = pushNotification(
+        state.notifications,
+        action.evaluation.outcome === 'Passed'
+          ? `"${task.title}" passed review.`
+          : `Instructor requested changes on "${task.title}".`,
+        action.evaluation.outcome === 'Passed' ? 'success' : 'warning'
+      );
+      return {
+        ...state,
+        miniTasks: { ...state.miniTasks, [action.taskId]: { status: action.evaluation.outcome, versions } },
+        notifications,
+      };
+    }
+
     case 'RECORD_ASSESSMENT_ATTEMPT': {
       const assessment = assessments.find((a) => a.id === action.assessmentId);
       if (!assessment) return state;
@@ -191,6 +213,7 @@ interface AppStateContextValue {
   completePractice: (practiceId: string) => void;
   submitCoding: (questionId: string, code: string) => void;
   submitMiniTask: (taskId: string, githubUrl: string, liveUrl: string, notes: string) => void;
+  adminEvaluateMiniTask: (taskId: string, version: number, evaluation: MiniTaskEvaluation) => void;
   submitAssessment: (assessmentId: string, answers: Record<string, number>) => void;
   advanceMilestone: (milestoneId: string, nextMilestoneId?: string) => void;
   submitProject: (githubUrl: string, liveUrl: string, documentationUrl: string) => void;
@@ -227,13 +250,14 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     timers.current.push(timer);
   }, [state.miniTasks]);
 
+  const adminEvaluateMiniTask = useCallback((taskId: string, version: number, evaluation: MiniTaskEvaluation) => dispatch({ type: 'ADMIN_EVALUATE_MINI_TASK', taskId, version, evaluation }), []);
   const submitAssessment = useCallback((assessmentId: string, answers: Record<string, number>) => dispatch({ type: 'RECORD_ASSESSMENT_ATTEMPT', assessmentId, answers }), []);
   const advanceMilestone = useCallback((milestoneId: string, nextMilestoneId?: string) => dispatch({ type: 'ADVANCE_MILESTONE', milestoneId, nextMilestoneId }), []);
   const submitProject = useCallback((githubUrl: string, liveUrl: string, documentationUrl: string) => dispatch({ type: 'SUBMIT_PROJECT', githubUrl, liveUrl, documentationUrl }), []);
 
   const value = useMemo<AppStateContextValue>(
-    () => ({ state, markTopicViewed, submitTopicTest, submitModuleTest, completePractice, submitCoding, submitMiniTask, submitAssessment, advanceMilestone, submitProject }),
-    [state, markTopicViewed, submitTopicTest, submitModuleTest, completePractice, submitCoding, submitMiniTask, submitAssessment, advanceMilestone, submitProject]
+    () => ({ state, markTopicViewed, submitTopicTest, submitModuleTest, completePractice, submitCoding, submitMiniTask, adminEvaluateMiniTask, submitAssessment, advanceMilestone, submitProject }),
+    [state, markTopicViewed, submitTopicTest, submitModuleTest, completePractice, submitCoding, submitMiniTask, adminEvaluateMiniTask, submitAssessment, advanceMilestone, submitProject]
   );
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;

@@ -52,10 +52,12 @@ const TopicDetailPage: React.FC<{ moduleId: string; topicId: string; onNavigate:
     );
   }
 
+  const rules = progression.getModuleRules(m);
   const testPassed = progression.isTopicTestPassed(topicId, progress);
   const attempts = progression.getTopicProgress(topicId, progress).testAttempts;
   const lastAttempt = attempts[attempts.length - 1];
-  const dailyGateOk = progression.isDailyCodingGateSatisfied(progress);
+  const dailyGateOk = !rules.requireDailyCoding || progression.isDailyCodingGateSatisfied(progress);
+  const topicComplete = progression.isTopicCompleted(m, topicId, progress);
   const index = m.topics.findIndex((t) => t.id === topicId);
   const nextTopic = m.topics[index + 1];
 
@@ -65,7 +67,7 @@ const TopicDetailPage: React.FC<{ moduleId: string; topicId: string; onNavigate:
 
       <div className="flex items-center gap-2.5 mb-1">
         <h1 className="text-2xl font-bold text-slate-900">{topic.title}</h1>
-        {testPassed && <StatusPill color="green">Completed</StatusPill>}
+        {topicComplete && <StatusPill color="green">Completed</StatusPill>}
       </div>
       <p className="text-slate-500 mb-6 flex items-center gap-1.5">
         <ClockIcon className="w-3.5 h-3.5" /> ~{topic.estimatedMinutes} min
@@ -139,7 +141,11 @@ const TopicDetailPage: React.FC<{ moduleId: string; topicId: string; onNavigate:
       )}
 
       <Card>
-        <SectionTitle>Topic Test</SectionTitle>
+        <SectionTitle
+          action={!rules.requireTopicTest && <span className="text-xs font-medium text-slate-400">Optional for this module</span>}
+        >
+          Topic Test
+        </SectionTitle>
         {test ? (
           <div>
             <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -156,7 +162,7 @@ const TopicDetailPage: React.FC<{ moduleId: string; topicId: string; onNavigate:
               )}
             </div>
 
-            {testPassed && (
+            {topicComplete && (
               <div className="mt-4 pt-4 border-t border-slate-100">
                 {!dailyGateOk ? (
                   <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
