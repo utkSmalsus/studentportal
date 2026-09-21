@@ -1,12 +1,24 @@
 // Derived values combining content definitions (this file's imports) with live
 // progress state (passed in by callers via useAppState()). Every number the UI
 // shows is computed here once — nothing is hand-typed twice, so it can't drift.
-import { moduleDefs, course, miniTasks, assessments, codingQuestions, majorProject } from './mockData';
-import { ModuleDef, MiniTaskDef, AssessmentDef, CodingQuestionDef } from './types';
+import { moduleDefs, course, miniTasks, assessments, codingQuestions, majorProject, topicTests, moduleTests } from './mockData';
+import { ModuleDef, MiniTaskDef, AssessmentDef, CodingQuestionDef, TopicDef, TopicTestDef, ModuleTestDef } from './types';
 import { StudentProgressState } from '../state/types';
 import * as progression from '../state/engine/progression';
 
-export { moduleDefs, course, miniTasks, assessments, codingQuestions, majorProject };
+export { moduleDefs, course, miniTasks, assessments, codingQuestions, majorProject, topicTests, moduleTests };
+
+export function getTopicById(moduleId: string, topicId: string): TopicDef | undefined {
+  return getModuleById(moduleId)?.topics.find((t) => t.id === topicId);
+}
+
+export function getTopicTestByTopicId(topicId: string): TopicTestDef | undefined {
+  return topicTests.find((t) => t.topicId === topicId);
+}
+
+export function getModuleTestById(moduleTestId: string): ModuleTestDef | undefined {
+  return moduleTests.find((t) => t.id === moduleTestId);
+}
 
 export type SkillLevel = 'Strong' | 'Developing' | 'Not Started';
 export interface SkillRating {

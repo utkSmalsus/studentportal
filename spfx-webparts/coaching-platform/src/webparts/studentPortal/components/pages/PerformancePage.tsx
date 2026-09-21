@@ -34,8 +34,8 @@ const PerformancePage: React.FC<{ onNavigate: (r: Route) => void }> = ({ onNavig
   const assess = assessmentStats(progress);
   const focus = recommendedFocus(progress);
 
-  const totalLessons = moduleDefs.reduce((s, m) => s + m.learn.length, 0);
-  const doneLessons = moduleDefs.reduce((s, m) => s + m.learn.filter((l) => progression.isLessonComplete(l.id, progress)).length, 0);
+  const totalLessons = moduleDefs.reduce((s, m) => s + m.topics.length, 0);
+  const doneLessons = moduleDefs.reduce((s, m) => s + m.topics.filter((t) => progression.isTopicTestPassed(t.id, progress)).length, 0);
   const totalPractice = moduleDefs.reduce((s, m) => s + m.practice.length, 0);
   const donePractice = moduleDefs.reduce((s, m) => s + m.practice.filter((p) => progression.isPracticeComplete(p.id, progress)).length, 0);
   const projectModule = getModuleById(majorProject.moduleId);

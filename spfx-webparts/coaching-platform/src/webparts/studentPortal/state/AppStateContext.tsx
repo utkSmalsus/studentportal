@@ -5,15 +5,18 @@
 // without a page refresh.
 import * as React from 'react';
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef } from 'react';
-import { StudentProgressState, NotificationItem, MiniTaskSubmissionVersion } from './types';
+import { StudentProgressState, NotificationItem, MiniTaskSubmissionVersion, QuizAttemptRecord } from './types';
 import { createInitialProgressState } from './initialState';
 import { evaluateCodingSubmission } from './engine/codingEvaluator';
 import { generateMiniTaskEvaluation } from './engine/miniTaskEvaluator';
 import { scoreAssessmentAttempt, AssessmentScoreResult } from './engine/assessmentEngine';
-import { codingQuestions, miniTasks, assessments, majorProject } from '../data/mockData';
+import { scoreQuiz } from './engine/quizEngine';
+import { codingQuestions, miniTasks, assessments, majorProject, topicTests, moduleTests } from '../data/mockData';
 
 type Action =
-  | { type: 'COMPLETE_LESSON'; lessonId: string }
+  | { type: 'MARK_TOPIC_VIEWED'; topicId: string }
+  | { type: 'SUBMIT_TOPIC_TEST'; topicId: string; answers: Record<string, number> }
+  | { type: 'SUBMIT_MODULE_TEST'; moduleId: string; moduleTestId: string; answers: Record<string, number> }
   | { type: 'COMPLETE_PRACTICE'; practiceId: string }
   | { type: 'RECORD_CODING_ATTEMPT'; questionId: string; code: string }
   | { type: 'SUBMIT_MINI_TASK'; taskId: string; githubUrl: string; liveUrl: string; notes: string }
@@ -29,8 +32,31 @@ function pushNotification(list: NotificationItem[], message: string, kind: Notif
 
 function reducer(state: StudentProgressState, action: Action): StudentProgressState {
   switch (action.type) {
-    case 'COMPLETE_LESSON':
-      return { ...state, lessonStatus: { ...state.lessonStatus, [action.lessonId]: 'completed' } };
+    case 'MARK_TOPIC_VIEWED': {
+      const existing = state.topics[action.topicId] || { contentViewed: false, testAttempts: [] };
+      if (existing.contentViewed) return state;
+      return { ...state, topics: { ...state.topics, [action.topicId]: { ...existing, contentViewed: true } } };
+    }
+
+    case 'SUBMIT_TOPIC_TEST': {
+      const test = topicTests.find((t) => t.topicId === action.topicId);
+      if (!test) return state;
+      const result = scoreQuiz(test.questions, action.answers, test.passingScorePercent);
+      const existing = state.topics[action.topicId] || { contentViewed: true, testAttempts: [] };
+      const record: QuizAttemptRecord = { attemptNo: existing.testAttempts.length + 1, answers: action.answers, scorePercent: result.scorePercent, passed: result.passed, date: new Date().toISOString() };
+      const notifications = pushNotification(state.notifications, `Topic test: ${result.scorePercent}% — ${result.passed ? 'passed' : 'not yet passed'}.`, result.passed ? 'success' : 'warning');
+      return { ...state, topics: { ...state.topics, [action.topicId]: { contentViewed: true, testAttempts: [...existing.testAttempts, record] } }, notifications };
+    }
+
+    case 'SUBMIT_MODULE_TEST': {
+      const test = moduleTests.find((t) => t.id === action.moduleTestId);
+      if (!test) return state;
+      const result = scoreQuiz(test.questions, action.answers, test.passingScorePercent);
+      const existing = state.moduleTests[action.moduleTestId] || { attempts: [] };
+      const record: QuizAttemptRecord = { attemptNo: existing.attempts.length + 1, answers: action.answers, scorePercent: result.scorePercent, passed: result.passed, date: new Date().toISOString() };
+      const notifications = pushNotification(state.notifications, `${test.title}: ${result.scorePercent}% — ${result.passed ? 'passed' : 'not yet passed'}.`, result.passed ? 'success' : 'warning');
+      return { ...state, moduleTests: { ...state.moduleTests, [action.moduleTestId]: { attempts: [...existing.attempts, record] } }, notifications };
+    }
 
     case 'COMPLETE_PRACTICE':
       return { ...state, practiceStatus: { ...state.practiceStatus, [action.practiceId]: 'completed' } };
@@ -159,7 +185,9 @@ function reducer(state: StudentProgressState, action: Action): StudentProgressSt
 
 interface AppStateContextValue {
   state: StudentProgressState;
-  completeLesson: (lessonId: string) => void;
+  markTopicViewed: (topicId: string) => void;
+  submitTopicTest: (topicId: string, answers: Record<string, number>) => void;
+  submitModuleTest: (moduleId: string, moduleTestId: string, answers: Record<string, number>) => void;
   completePractice: (practiceId: string) => void;
   submitCoding: (questionId: string, code: string) => void;
   submitMiniTask: (taskId: string, githubUrl: string, liveUrl: string, notes: string) => void;
@@ -180,7 +208,9 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   useEffect(() => () => { timers.current.forEach((t) => window.clearTimeout(t)); }, []);
 
-  const completeLesson = useCallback((lessonId: string) => dispatch({ type: 'COMPLETE_LESSON', lessonId }), []);
+  const markTopicViewed = useCallback((topicId: string) => dispatch({ type: 'MARK_TOPIC_VIEWED', topicId }), []);
+  const submitTopicTest = useCallback((topicId: string, answers: Record<string, number>) => dispatch({ type: 'SUBMIT_TOPIC_TEST', topicId, answers }), []);
+  const submitModuleTest = useCallback((moduleId: string, moduleTestId: string, answers: Record<string, number>) => dispatch({ type: 'SUBMIT_MODULE_TEST', moduleId, moduleTestId, answers }), []);
   const completePractice = useCallback((practiceId: string) => dispatch({ type: 'COMPLETE_PRACTICE', practiceId }), []);
   const submitCoding = useCallback((questionId: string, code: string) => dispatch({ type: 'RECORD_CODING_ATTEMPT', questionId, code }), []);
 
@@ -202,8 +232,8 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const submitProject = useCallback((githubUrl: string, liveUrl: string, documentationUrl: string) => dispatch({ type: 'SUBMIT_PROJECT', githubUrl, liveUrl, documentationUrl }), []);
 
   const value = useMemo<AppStateContextValue>(
-    () => ({ state, completeLesson, completePractice, submitCoding, submitMiniTask, submitAssessment, advanceMilestone, submitProject }),
-    [state, completeLesson, completePractice, submitCoding, submitMiniTask, submitAssessment, advanceMilestone, submitProject]
+    () => ({ state, markTopicViewed, submitTopicTest, submitModuleTest, completePractice, submitCoding, submitMiniTask, submitAssessment, advanceMilestone, submitProject }),
+    [state, markTopicViewed, submitTopicTest, submitModuleTest, completePractice, submitCoding, submitMiniTask, submitAssessment, advanceMilestone, submitProject]
   );
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;

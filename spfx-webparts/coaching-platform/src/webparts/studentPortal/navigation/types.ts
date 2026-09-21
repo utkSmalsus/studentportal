@@ -2,6 +2,9 @@ export type Route =
   | { view: 'home' }
   | { view: 'journey' }
   | { view: 'moduleDetail'; moduleId: string }
+  | { view: 'topicDetail'; moduleId: string; topicId: string }
+  | { view: 'topicTestAttempt'; moduleId: string; topicId: string }
+  | { view: 'moduleTestAttempt'; moduleId: string }
   | { view: 'coding' }
   | { view: 'challengeDetail'; questionId: string }
   | { view: 'tasks' }
@@ -20,6 +23,9 @@ export type TopLevelView = 'home' | 'journey' | 'coding' | 'tasks' | 'project' |
 export function topLevelFor(route: Route): TopLevelView {
   switch (route.view) {
     case 'moduleDetail':
+    case 'topicDetail':
+    case 'topicTestAttempt':
+    case 'moduleTestAttempt':
       return 'journey';
     case 'challengeDetail':
       return 'coding';

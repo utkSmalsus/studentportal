@@ -153,7 +153,7 @@ const HomePage: React.FC<{ userDisplayName: string; onNavigate: (r: Route) => vo
           <Card>
             <SectionTitle>Today&apos;s Plan</SectionTitle>
             <div>
-              {active && action && (action.kind === 'learn' || action.kind === 'practice') && (
+              {active && action && action.kind === 'topic' && (
                 <PlanRow
                   index={1}
                   icon={<CodeIcon className="w-[18px] h-[18px] text-indigo-600" />}
@@ -161,12 +161,48 @@ const HomePage: React.FC<{ userDisplayName: string; onNavigate: (r: Route) => vo
                   title={action.title}
                   meta={action.meta}
                   actionLabel="Continue Learning"
+                  onAction={() => onNavigate({ view: 'topicDetail', moduleId: active.id, topicId: action.topicId! })}
+                  accent="bg-indigo-50"
+                />
+              )}
+              {active && action && action.kind === 'dailyGate' && (
+                <PlanRow
+                  index={1}
+                  icon={<AlertIcon className="w-[18px] h-[18px] text-amber-600" />}
+                  eyebrow="Daily Coding Required"
+                  title={action.title}
+                  meta={action.meta}
+                  actionLabel="Go to Daily Coding"
+                  onAction={() => onNavigate({ view: 'coding' })}
+                  accent="bg-amber-50"
+                />
+              )}
+              {active && action && action.kind === 'practice' && (
+                <PlanRow
+                  index={1}
+                  icon={<CodeIcon className="w-[18px] h-[18px] text-indigo-600" />}
+                  eyebrow="Practice"
+                  title={action.title}
+                  meta={action.meta}
+                  actionLabel="Continue Practice"
                   onAction={() => onNavigate({ view: 'moduleDetail', moduleId: active.id })}
                   accent="bg-indigo-50"
                 />
               )}
               {active && action && action.kind === 'miniTask' && (
                 <MiniTaskPlanRow index={1} moduleId={active.id} onNavigate={onNavigate} />
+              )}
+              {active && action && action.kind === 'moduleTest' && (
+                <PlanRow
+                  index={1}
+                  icon={<ClipboardIcon className="w-[18px] h-[18px] text-indigo-600" />}
+                  eyebrow="Module Test"
+                  title={action.title}
+                  meta={action.meta}
+                  actionLabel="Start Module Test"
+                  onAction={() => onNavigate({ view: 'moduleTestAttempt', moduleId: active.id })}
+                  accent="bg-indigo-50"
+                />
               )}
               {active && action && action.kind === 'assessment' && (
                 <PlanRow

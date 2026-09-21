@@ -1,29 +1,49 @@
 // The seed narrative: one coherent student, not a grab-bag of demo fragments.
 // Foundation → Frontend is complete (including a full resubmit-to-pass mini task
-// history on React Hooks), Node.js is the active module with a live "Changes
+// history on React Hooks), Node.js is the active module with its first two topics
+// passed and the third ("File System & Streams") in progress, a live "Changes
 // Requested" task ready to be fixed and resubmitted, Backend/Full Stack beyond
 // Node are locked, and the Major Project has unlocked in parallel (it only needs
 // Frontend, not the whole course) and is 40% in progress — matching a coaching
 // center that lets capstone work start once core skills are covered.
-import { StudentProgressState } from './types';
+import { StudentProgressState, TopicProgressEntry, QuizAttemptRecord } from './types';
 
 const now = new Date();
 const daysAgo = (n: number): string => new Date(now.getTime() - n * 86400000).toISOString();
 
-export function createInitialProgressState(): StudentProgressState {
+function passedTopic(daysAgoSubmitted: number): TopicProgressEntry {
   return {
-    lessonStatus: {
-      'html-l1': 'completed', 'html-l2': 'completed',
-      'css-l1': 'completed', 'css-l2': 'completed',
-      'jsb-l1': 'completed', 'jsb-l2': 'completed', 'jsb-l3': 'completed',
-      'jsi-l1': 'completed', 'jsi-l2': 'completed', 'jsi-l3': 'completed',
-      'jsa-l1': 'completed', 'jsa-l2': 'completed', 'jsa-l3': 'completed',
-      'react-l1': 'completed', 'react-l2': 'completed',
-      'rh-l1': 'completed', 'rh-l2': 'completed', 'rh-l3': 'completed',
-      'sm-l1': 'completed',
-      'rp-l1': 'completed',
-      'node-l1': 'completed', 'node-l2': 'completed', 'node-l3': 'current',
-    },
+    contentViewed: true,
+    testAttempts: [{ attemptNo: 1, answers: {}, scorePercent: 90, passed: true, date: daysAgo(daysAgoSubmitted) }],
+  };
+}
+
+function passedQuiz(daysAgoSubmitted: number): { attempts: QuizAttemptRecord[] } {
+  return { attempts: [{ attemptNo: 1, answers: {}, scorePercent: 85, passed: true, date: daysAgo(daysAgoSubmitted) }] };
+}
+
+// Every topic id in a completed module, oldest module completed longest ago.
+const completedTopicIds: [string, number][] = [
+  ['html-t1', 178], ['html-t2', 178],
+  ['css-t1', 166], ['css-t2', 166],
+  ['js-basics-t1', 150], ['js-basics-t2', 150], ['js-basics-t3', 150],
+  ['js-intermediate-t1', 133], ['js-intermediate-t2', 133], ['js-intermediate-t3', 133],
+  ['js-advanced-t1', 112], ['js-advanced-t2', 112], ['js-advanced-t3', 112],
+  ['react-t1', 95], ['react-t2', 95],
+  ['react-hooks-t1', 25], ['react-hooks-t2', 25], ['react-hooks-t3', 25],
+  ['state-management-t1', 20],
+  ['react-projects-t1', 18],
+];
+
+export function createInitialProgressState(): StudentProgressState {
+  const topics: Record<string, TopicProgressEntry> = {};
+  completedTopicIds.forEach(([id, days]) => { topics[id] = passedTopic(days); });
+  topics['node-t1'] = passedTopic(6);
+  topics['node-t2'] = passedTopic(3);
+  topics['node-t3'] = { contentViewed: false, testAttempts: [] };
+
+  return {
+    topics,
     practiceStatus: {
       'html-p1': 'completed', 'html-p2': 'completed',
       'css-p1': 'completed',
@@ -79,6 +99,14 @@ export function createInitialProgressState(): StudentProgressState {
       },
       'task-express-api': { status: 'Not Started', versions: [] },
       'task-mongo-schema': { status: 'Not Started', versions: [] },
+    },
+    moduleTests: {
+      'test-css': passedQuiz(163),
+      'test-js-basics': passedQuiz(148),
+      'test-js-intermediate': passedQuiz(135),
+      'test-js-advanced': passedQuiz(114),
+      'test-react': passedQuiz(96),
+      'test-react-hooks': passedQuiz(26),
     },
     assessments: {
       'assess-html-css': { attempts: [{ attemptNo: 1, answers: {}, scorePercent: 92, passed: true, strongTopics: ['HTML', 'CSS', 'Responsive Design'], weakTopics: [], date: daysAgo(165) }] },

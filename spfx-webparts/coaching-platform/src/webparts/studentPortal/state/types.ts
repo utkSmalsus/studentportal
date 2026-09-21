@@ -2,8 +2,22 @@
 // definitions by the engine to produce everything a page renders. This is the
 // single source of truth — no page keeps its own copy of "is this done".
 
-export type LessonStatus = 'completed' | 'current' | 'upcoming';
 export type PracticeStatus = 'completed' | 'current' | 'upcoming';
+
+// A lightweight scored attempt shared by Topic Tests and Module Tests — neither
+// needs the full Assessment shape (no strong/weak topic breakdown), just a score.
+export interface QuizAttemptRecord {
+  attemptNo: number;
+  answers: Record<string, number>;
+  scorePercent: number;
+  passed: boolean;
+  date: string;
+}
+
+export interface TopicProgressEntry {
+  contentViewed: boolean;
+  testAttempts: QuizAttemptRecord[];
+}
 
 export interface CodingAttempt {
   code: string;
@@ -88,12 +102,13 @@ export interface NotificationItem {
 }
 
 export interface StudentProgressState {
-  lessonStatus: Record<string, LessonStatus>;
+  topics: Record<string, TopicProgressEntry>;
   practiceStatus: Record<string, PracticeStatus>;
   coding: Record<string, CodingProgressEntry>;
   codingCurrentDay: number;
   codingStreak: { current: number; best: number };
   miniTasks: Record<string, MiniTaskProgressEntry>;
+  moduleTests: Record<string, { attempts: QuizAttemptRecord[] }>;
   assessments: Record<string, AssessmentProgressEntry>;
   project: ProjectProgressState;
   notifications: NotificationItem[];

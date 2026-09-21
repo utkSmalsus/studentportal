@@ -7,6 +7,9 @@ import { Route } from '../navigation/types';
 import HomePage from './pages/HomePage';
 import JourneyPage from './pages/JourneyPage';
 import ModuleDetailPage from './pages/ModuleDetailPage';
+import TopicDetailPage from './pages/TopicDetailPage';
+import TopicTestAttemptPage from './pages/TopicTestAttemptPage';
+import ModuleTestAttemptPage from './pages/ModuleTestAttemptPage';
 import CodingPage from './pages/CodingPage';
 import ChallengeDetailPage from './pages/ChallengeDetailPage';
 import TasksPage from './pages/TasksPage';
@@ -30,6 +33,12 @@ const StudentPortalShell: React.FC<IStudentPortalProps> = ({ userDisplayName }) 
         return <JourneyPage onNavigate={setRoute} />;
       case 'moduleDetail':
         return <ModuleDetailPage moduleId={route.moduleId} onNavigate={setRoute} />;
+      case 'topicDetail':
+        return <TopicDetailPage moduleId={route.moduleId} topicId={route.topicId} onNavigate={setRoute} />;
+      case 'topicTestAttempt':
+        return <TopicTestAttemptPage moduleId={route.moduleId} topicId={route.topicId} onNavigate={setRoute} />;
+      case 'moduleTestAttempt':
+        return <ModuleTestAttemptPage moduleId={route.moduleId} onNavigate={setRoute} />;
       case 'coding':
         return <CodingPage onNavigate={setRoute} />;
       case 'challengeDetail':

@@ -6,17 +6,62 @@
 export type ModuleGroup = 'Foundation' | 'Programming' | 'Frontend' | 'Backend' | 'Full Stack' | 'Capstone';
 export type Difficulty = 'Beginner' | 'Intermediate' | 'Advanced';
 
-export interface LessonDef {
-  id: string;
-  title: string;
-  estimatedMinutes: number;
-}
-
 export interface PracticeDef {
   id: string;
   title: string;
   description: string;
   estimatedMinutes: number;
+}
+
+// ---- Topics: the real learning unit. Video + content + a lightweight quiz gate. ----
+
+export interface TopicContent {
+  whatYoullLearn: string[];
+  keyConcepts: string[];
+  examples: string[];
+  notes: string[];
+  resources: string[];
+}
+
+export interface TopicTestQuestionDef {
+  id: string;
+  text: string;
+  options: string[];
+  correctIndex: number;
+}
+
+// Deliberately lighter than a full Assessment — a handful of questions checking
+// whether the student absorbed THIS topic, not a formal exam.
+export interface TopicTestDef {
+  id: string;
+  topicId: string;
+  passingScorePercent: number;
+  questions: TopicTestQuestionDef[];
+}
+
+export interface TopicDef {
+  id: string;
+  moduleId: string;
+  title: string;
+  estimatedMinutes: number;
+  // Configured through data, never hardcoded in a component — this is what lets an
+  // admin attach/change a lesson video later without touching UI code. Undefined is
+  // a valid, expected state ("video coming soon"), not an error.
+  youtubeVideoId?: string;
+  content: TopicContent;
+  testId: string;
+}
+
+// A full exam-style check spanning every topic in the module — heavier than a topic
+// test, lighter than the course Assessment. Sits between "all topics done" and
+// "assessment unlocked" in the module completion flow.
+export interface ModuleTestDef {
+  id: string;
+  moduleId: string;
+  title: string;
+  timeLimitMinutes: number;
+  passingScorePercent: number;
+  questions: TopicTestQuestionDef[];
 }
 
 export interface ModuleDef {
@@ -25,9 +70,10 @@ export interface ModuleDef {
   group: ModuleGroup;
   estimatedDuration: string;
   whatYoullLearn: string[];
-  learn: LessonDef[];
+  topics: TopicDef[];
   practice: PracticeDef[];
   miniTaskId?: string;
+  moduleTestId?: string;
   assessmentId?: string;
   // A module with no prerequisite is unlocked from day one. Everything else stays
   // locked until the engine confirms the prerequisite module is complete.
