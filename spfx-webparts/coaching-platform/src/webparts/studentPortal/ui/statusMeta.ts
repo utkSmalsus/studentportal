@@ -1,19 +1,49 @@
-import { JourneyItemStatus, SubmissionStatus } from '../data/types';
+// Color is semantic, not decorative: green = done, blue = active now,
+// amber = needs your attention, red = failed, gray = not available yet.
+export type SemanticColor = 'green' | 'blue' | 'amber' | 'red' | 'gray';
 
-export const journeyStatusMeta: Record<JourneyItemStatus, { label: string; icon: string; dot: string; badge: 'green' | 'blue' | 'gray' | 'amber' | 'red' }> = {
-  completed: { label: 'Completed', icon: '✓', dot: 'bg-emerald-500', badge: 'green' },
-  current: { label: 'Currently Learning', icon: '●', dot: 'bg-blue-600', badge: 'blue' },
-  locked: { label: 'Locked', icon: '🔒', dot: 'bg-gray-300', badge: 'gray' },
-  failed: { label: 'Failed', icon: '✗', dot: 'bg-red-500', badge: 'red' },
-  pendingEvaluation: { label: 'Pending Evaluation', icon: '⏳', dot: 'bg-amber-400', badge: 'amber' },
-  resubmissionRequired: { label: 'Resubmission Required', icon: '↻', dot: 'bg-amber-500', badge: 'amber' },
+export const colorClasses: Record<SemanticColor, { text: string; bg: string; dot: string; border: string }> = {
+  green: { text: 'text-emerald-700', bg: 'bg-emerald-50', dot: 'bg-emerald-500', border: 'border-emerald-200' },
+  blue: { text: 'text-blue-700', bg: 'bg-blue-50', dot: 'bg-blue-600', border: 'border-blue-200' },
+  amber: { text: 'text-amber-700', bg: 'bg-amber-50', dot: 'bg-amber-500', border: 'border-amber-200' },
+  red: { text: 'text-red-700', bg: 'bg-red-50', dot: 'bg-red-500', border: 'border-red-200' },
+  gray: { text: 'text-gray-500', bg: 'bg-gray-100', dot: 'bg-gray-300', border: 'border-gray-200' },
 };
 
-export const submissionStatusBadge: Record<SubmissionStatus, 'green' | 'blue' | 'gray' | 'amber' | 'red'> = {
-  Submitted: 'blue',
-  'Under Review': 'amber',
-  Passed: 'green',
-  Failed: 'red',
-  'Changes Requested': 'amber',
-  Completed: 'green',
+export const moduleStatusMeta: Record<string, { label: string; icon: string; color: SemanticColor }> = {
+  completed: { label: 'Complete', icon: '✓', color: 'green' },
+  current: { label: 'In Progress', icon: '●', color: 'blue' },
+  upcoming: { label: 'Upcoming', icon: '○', color: 'gray' },
+  locked: { label: 'Locked', icon: '○', color: 'gray' },
+  failed: { label: 'Failed', icon: '✗', color: 'red' },
+};
+
+export const miniTaskStatusMeta: Record<string, { color: SemanticColor }> = {
+  'Not Started': { color: 'gray' },
+  'In Progress': { color: 'blue' },
+  Submitted: { color: 'blue' },
+  'Under Review': { color: 'amber' },
+  'Changes Requested': { color: 'amber' },
+  Resubmitted: { color: 'blue' },
+  Passed: { color: 'green' },
+};
+
+export const assessmentStatusMeta: Record<string, { label: string; color: SemanticColor }> = {
+  'not-started': { label: 'Not Started', color: 'gray' },
+  'in-progress': { label: 'In Progress', color: 'blue' },
+  passed: { label: 'Passed', color: 'green' },
+  failed: { label: 'Failed', color: 'red' },
+};
+
+export const codingStatusMeta: Record<string, { label: string; color: SemanticColor }> = {
+  solved: { label: 'Solved', color: 'green' },
+  failed: { label: 'Failed', color: 'red' },
+  pending: { label: 'Upcoming', color: 'gray' },
+  today: { label: "Today's Challenge", color: 'blue' },
+};
+
+export const difficultyColor: Record<string, SemanticColor> = {
+  Beginner: 'green',
+  Intermediate: 'amber',
+  Advanced: 'red',
 };

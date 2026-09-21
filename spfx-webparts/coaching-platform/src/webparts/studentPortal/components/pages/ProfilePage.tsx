@@ -1,63 +1,34 @@
 import * as React from 'react';
-import { Card, SectionTitle, LabeledProgress, StatTile } from '../../ui/Primitives';
-import { profile, dailyCodingStats, miniTasks, assessments, majorProject } from '../../data/mockData';
+import { Divider } from '../../ui/Primitives';
+import { profile } from '../../data/mockData';
 
-const ProfilePage: React.FC<{ userDisplayName: string }> = ({ userDisplayName }) => {
-  const miniTasksCompleted = miniTasks.filter((t) => t.status === 'Completed').length;
-  const assessmentsAvgScore = Math.round(
-    assessments.filter((a) => a.bestScore !== undefined).reduce((sum, a) => sum + (a.bestScore! / a.totalMarks) * 100, 0) /
-      Math.max(1, assessments.filter((a) => a.bestScore !== undefined).length)
-  );
+const Row: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+  <div className="flex justify-between max-w-sm">
+    <dt className="text-gray-400">{label}</dt>
+    <dd className="text-gray-800 font-medium">{value}</dd>
+  </div>
+);
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <div className="w-16 h-16 rounded-full bg-blue-600 text-white flex items-center justify-center text-xl font-semibold">
-          {userDisplayName.charAt(0)}
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">{userDisplayName || profile.name}</h1>
-          <p className="text-gray-500">
-            {profile.course} · {profile.batch}
-          </p>
-          <p className="text-xs text-gray-400">Joined {profile.joiningDate}</p>
-        </div>
+const ProfilePage: React.FC<{ userDisplayName: string }> = ({ userDisplayName }) => (
+  <div>
+    <div className="flex items-center gap-4">
+      <div className="w-14 h-14 rounded-full bg-gray-900 text-white flex items-center justify-center text-lg font-semibold">
+        {(userDisplayName || profile.name).charAt(0)}
       </div>
-
-      <Card>
-        <SectionTitle>Skills</SectionTitle>
-        <div className="space-y-3">
-          {profile.skills.map((s) => (
-            <LabeledProgress key={s.label} label={s.label} percent={s.percent} />
-          ))}
-        </div>
-      </Card>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <SectionTitle>Coding</SectionTitle>
-          <div className="flex flex-col gap-3">
-            <StatTile label="Problems Solved" value={dailyCodingStats.solved} />
-            <StatTile label="Success Rate" value={`${dailyCodingStats.successRate}%`} />
-            <StatTile label="Current Streak" value={`${dailyCodingStats.currentStreak} days`} />
-          </div>
-        </Card>
-        <Card>
-          <SectionTitle>Tasks</SectionTitle>
-          <div className="flex flex-col gap-3">
-            <StatTile label="Completed" value={`${miniTasksCompleted}/${miniTasks.length}`} />
-          </div>
-        </Card>
-        <Card>
-          <SectionTitle>Assessments &amp; Projects</SectionTitle>
-          <div className="flex flex-col gap-3">
-            <StatTile label="Average Score" value={`${assessmentsAvgScore}%`} />
-            <StatTile label="Current Project" value={majorProject.title} />
-          </div>
-        </Card>
+      <div>
+        <h1 className="text-xl font-semibold text-gray-900">{userDisplayName || profile.name}</h1>
+        <p className="text-sm text-gray-500">{profile.batch}</p>
       </div>
     </div>
-  );
-};
+
+    <Divider />
+
+    <dl className="text-sm space-y-2">
+      <Row label="Course" value={profile.course} />
+      <Row label="Batch" value={profile.batch} />
+      <Row label="Joined" value={profile.joiningDate} />
+    </dl>
+  </div>
+);
 
 export default ProfilePage;

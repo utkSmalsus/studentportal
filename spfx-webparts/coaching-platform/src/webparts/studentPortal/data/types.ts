@@ -1,92 +1,162 @@
-export type JourneyItemStatus =
-  | 'completed'
-  | 'current'
-  | 'locked'
-  | 'failed'
-  | 'pendingEvaluation'
-  | 'resubmissionRequired';
+// Domain types for the student learning experience. Shaped so a real API/SharePoint
+// data source can replace `mockData.ts` later without any UI code changing — every
+// page reads these types only, never a hardcoded shape.
 
-export interface JourneyItem {
+export type ModuleStatus = 'completed' | 'current' | 'upcoming' | 'locked' | 'failed';
+
+export type ModuleGroup = 'Foundation' | 'Programming' | 'Frontend' | 'Backend' | 'Full Stack' | 'Capstone';
+
+export interface LearningStep {
   id: string;
   title: string;
-  itemType: 'topic' | 'assessment' | 'miniTask' | 'project';
-  status: JourneyItemStatus;
-  estimatedDuration: string;
+  status: 'completed' | 'current' | 'upcoming';
 }
 
-export interface ModuleProgress {
+export interface CourseModule {
+  id: string;
   title: string;
-  percent: number;
+  group: ModuleGroup;
+  status: ModuleStatus;
+  progressPercent: number;
+  whatYoullLearn: string[];
+  learn: LearningStep[];
+  practice: LearningStep[];
+  miniTaskId?: string;
+  assessmentId?: string;
+  prerequisiteModuleId?: string;
 }
 
-export interface DailyCodingStats {
-  attempted: number;
-  solved: number;
-  successRate: number;
-  currentStreak: number;
-  bestStreak: number;
+export interface Course {
+  id: string;
+  title: string;
+  currentWeek: number;
+  currentModuleId: string;
 }
+
+// ---- Daily Coding (independent of the course journey) ----
+
+export type CodingQuestionStatus = 'solved' | 'failed' | 'pending' | 'today';
+export type CodingDifficulty = 'Beginner' | 'Intermediate' | 'Advanced';
 
 export interface CodingQuestion {
+  id: string;
   day: number;
   title: string;
-  difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
-  status: 'solved' | 'failed' | 'pending' | 'today';
+  difficulty: CodingDifficulty;
+  topic: string;
+  tags: string[];
+  status: CodingQuestionStatus;
+  problemStatement: string;
+  exampleInput: string;
+  exampleOutput: string;
+  constraints: string[];
+  testCasesTotal: number;
+  testCasesPassed?: number;
+  scorePercent?: number;
+  timeComplexity?: string;
+  feedback?: string;
 }
 
-export type SubmissionStatus =
+export interface WeekDayStatus {
+  day: string;
+  status: 'solved' | 'missed' | 'today' | 'upcoming';
+}
+
+// ---- Mini Tasks ----
+
+export type MiniTaskStatus =
+  | 'Not Started'
+  | 'In Progress'
   | 'Submitted'
   | 'Under Review'
-  | 'Passed'
-  | 'Failed'
   | 'Changes Requested'
-  | 'Completed';
+  | 'Resubmitted'
+  | 'Passed';
+
+export interface EvaluationCriterion {
+  label: string;
+  score: number;
+  maxScore: number;
+}
+
+export interface Evaluation {
+  criteria: EvaluationCriterion[];
+  feedback: string;
+  status: 'Changes Requested' | 'Approved';
+  evaluatedAt: string;
+}
 
 export interface MiniTask {
   id: string;
   title: string;
-  description: string;
-  difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
+  moduleId: string;
+  difficulty: CodingDifficulty;
+  estimatedDuration: string;
   deadline: string;
-  status: SubmissionStatus;
-  score?: number;
-  maxScore?: number;
-  feedback?: string;
+  objective: string;
+  requirements: { label: string; done: boolean }[];
+  skills: string[];
+  status: MiniTaskStatus;
+  submission?: { githubUrl: string; liveUrl: string; notes: string };
+  evaluation?: Evaluation;
 }
 
-export interface AssessmentSummary {
+// ---- Assessments ----
+
+export interface AssessmentAttempt {
+  attemptNo: number;
+  scorePercent: number;
+  date: string;
+}
+
+export interface Assessment {
   id: string;
   title: string;
-  totalMarks: number;
-  passingMarks: number;
+  moduleId: string;
+  topics: string[];
+  totalQuestions: number;
   timeLimitMinutes: number;
+  passingScorePercent: number;
   attemptsAllowed: number;
-  attemptsUsed: number;
-  bestScore?: number;
+  attempts: AssessmentAttempt[];
   status: 'not-started' | 'in-progress' | 'passed' | 'failed';
+  strongAreas: string[];
+  needsImprovement: string[];
 }
 
-export interface ProjectMilestone {
+// ---- Major Project ----
+
+export interface Milestone {
   title: string;
-  done: boolean;
+  status: 'completed' | 'current' | 'upcoming';
 }
 
-export interface MajorProjectSummary {
+export interface MajorProject {
   title: string;
-  description: string;
-  deadline: string;
-  status: SubmissionStatus | 'not-started';
-  milestones: ProjectMilestone[];
-  evaluationCriteria: { label: string; score: number; maxScore: number }[];
-  githubUrl?: string;
-  liveUrl?: string;
+  subtitle: string;
+  progressPercent: number;
+  milestones: Milestone[];
+  currentMilestone: string;
+  deadlineInDays: number;
+  evaluationCriteria: EvaluationCriterion[];
 }
 
-export interface Certificate {
+// ---- Feedback & Performance ----
+
+export interface RecentFeedback {
   id: string;
-  courseTitle: string;
-  issuedAt: string;
-  fileUrl: string;
+  sourceType: 'miniTask' | 'assessment' | 'project';
+  sourceId: string;
+  title: string;
+  status: string;
+  comment: string;
+}
+
+export type SkillLevel = 'Strong' | 'Developing' | 'Not Started';
+
+export interface SkillRating {
+  label: string;
+  level: SkillLevel;
 }
 
 export interface StudentProfile {
@@ -94,5 +164,4 @@ export interface StudentProfile {
   course: string;
   batch: string;
   joiningDate: string;
-  skills: { label: string; percent: number }[];
 }
