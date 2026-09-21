@@ -1,0 +1,23 @@
+{
+  "@microsoft/generator-sharepoint": {
+    "whichFolder": "subdir",
+    "solutionName": "coaching-platform",
+    "environment": "spo",
+    "packageManager": "npm",
+    "skipFeatureDeployment": true,
+    "useGulp": false,
+    "componentType": "webpart",
+    "template": "react",
+    "componentName": "StudentPortal",
+    "componentDescription": "Student portal webpart",
+    "plusBeta": false,
+    "isCreatingSolution": true,
+    "nodeVersion": "22.23.0",
+    "sdksVersions": {},
+    "version": "1.23.2",
+    "libraryName": "coaching-platform",
+    "libraryId": "3c2282a0-e235-4fbb-8991-b7993d4559af",
+    "solutionShortDescription": "coaching-platform description",
+    "isDomainIsolated": false
+  }
+}

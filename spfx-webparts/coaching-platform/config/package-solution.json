@@ -1,0 +1,40 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/package-solution.schema.json",
+  "solution": {
+    "name": "coaching-platform-client-side-solution",
+    "id": "3c2282a0-e235-4fbb-8991-b7993d4559af",
+    "version": "1.0.0.0",
+    "includeClientSideAssets": true,
+    "skipFeatureDeployment": true,
+    "isDomainIsolated": false,
+    "developer": {
+      "name": "",
+      "websiteUrl": "",
+      "privacyUrl": "",
+      "termsOfUseUrl": "",
+      "mpnId": "Undefined-1.23.2"
+    },
+    "metadata": {
+      "shortDescription": {
+        "default": "coaching-platform description"
+      },
+      "longDescription": {
+        "default": "coaching-platform description"
+      },
+      "screenshotPaths": [],
+      "videoUrl": "",
+      "categories": []
+    },
+    "features": [
+      {
+        "title": "coaching-platform Feature",
+        "description": "The feature that activates elements of the coaching-platform solution.",
+        "id": "032c3e0c-67be-4fe7-b963-96e7ecb96675",
+        "version": "1.0.0.0"
+      }
+    ]
+  },
+  "paths": {
+    "zippedPackage": "solution/coaching-platform.sppkg"
+  }
+}
