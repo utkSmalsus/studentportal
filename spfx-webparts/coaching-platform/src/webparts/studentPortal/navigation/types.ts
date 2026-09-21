@@ -7,6 +7,7 @@ export type Route =
   | { view: 'tasks' }
   | { view: 'taskDetail'; taskId: string }
   | { view: 'assessmentDetail'; assessmentId: string }
+  | { view: 'assessmentAttempt'; assessmentId: string }
   | { view: 'project' }
   | { view: 'performance' }
   | { view: 'certificates' }
@@ -25,6 +26,7 @@ export function topLevelFor(route: Route): TopLevelView {
     case 'taskDetail':
       return 'tasks';
     case 'assessmentDetail':
+    case 'assessmentAttempt':
       return 'journey';
     default:
       return route.view;

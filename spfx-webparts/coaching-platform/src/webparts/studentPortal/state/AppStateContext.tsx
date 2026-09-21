@@ -1,0 +1,216 @@
+// The single source of truth for everything the student has done. Every page reads
+// from here via useAppState() and dispatches actions through the returned helpers —
+// nothing keeps its own local copy of "is this submitted / is this passed". That's
+// what makes an action on one screen show up correctly on every other screen
+// without a page refresh.
+import * as React from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef } from 'react';
+import { StudentProgressState, NotificationItem, MiniTaskSubmissionVersion } from './types';
+import { createInitialProgressState } from './initialState';
+import { evaluateCodingSubmission } from './engine/codingEvaluator';
+import { generateMiniTaskEvaluation } from './engine/miniTaskEvaluator';
+import { scoreAssessmentAttempt, AssessmentScoreResult } from './engine/assessmentEngine';
+import { codingQuestions, miniTasks, assessments, majorProject } from '../data/mockData';
+
+type Action =
+  | { type: 'COMPLETE_LESSON'; lessonId: string }
+  | { type: 'COMPLETE_PRACTICE'; practiceId: string }
+  | { type: 'RECORD_CODING_ATTEMPT'; questionId: string; code: string }
+  | { type: 'SUBMIT_MINI_TASK'; taskId: string; githubUrl: string; liveUrl: string; notes: string }
+  | { type: 'EVALUATE_MINI_TASK'; taskId: string; version: number }
+  | { type: 'RECORD_ASSESSMENT_ATTEMPT'; assessmentId: string; answers: Record<string, number> }
+  | { type: 'ADVANCE_MILESTONE'; milestoneId: string; nextMilestoneId?: string }
+  | { type: 'SUBMIT_PROJECT'; githubUrl: string; liveUrl: string; documentationUrl: string };
+
+function pushNotification(list: NotificationItem[], message: string, kind: NotificationItem['kind']): NotificationItem[] {
+  const item: NotificationItem = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, message, date: new Date().toISOString(), kind };
+  return [item, ...list].slice(0, 20);
+}
+
+function reducer(state: StudentProgressState, action: Action): StudentProgressState {
+  switch (action.type) {
+    case 'COMPLETE_LESSON':
+      return { ...state, lessonStatus: { ...state.lessonStatus, [action.lessonId]: 'completed' } };
+
+    case 'COMPLETE_PRACTICE':
+      return { ...state, practiceStatus: { ...state.practiceStatus, [action.practiceId]: 'completed' } };
+
+    case 'RECORD_CODING_ATTEMPT': {
+      const question = codingQuestions.find((q) => q.id === action.questionId);
+      if (!question) return state;
+      const attempt = evaluateCodingSubmission(question, action.code);
+      const existing = state.coding[action.questionId] || { attempts: [] };
+      const alreadySolved = existing.attempts.some((a) => a.passed);
+      const isToday = question.day === state.codingCurrentDay;
+
+      let codingCurrentDay = state.codingCurrentDay;
+      let streak = state.codingStreak;
+      let notifications = state.notifications;
+
+      if (attempt.passed && !alreadySolved && isToday) {
+        streak = { current: streak.current + 1, best: Math.max(streak.best, streak.current + 1) };
+        const nextDay = codingQuestions.map((q) => q.day).filter((d) => d > question.day).sort((a, b) => a - b)[0];
+        if (nextDay) codingCurrentDay = nextDay;
+        notifications = pushNotification(notifications, `Day ${question.day} solved — streak now ${streak.current} days.`, 'success');
+      } else if (!attempt.passed) {
+        notifications = pushNotification(notifications, `Day ${question.day} attempt: ${attempt.passedTests}/${attempt.totalTests} tests passed.`, 'info');
+      }
+
+      return {
+        ...state,
+        coding: { ...state.coding, [action.questionId]: { attempts: [...existing.attempts, attempt] } },
+        codingCurrentDay,
+        codingStreak: streak,
+        notifications,
+      };
+    }
+
+    case 'SUBMIT_MINI_TASK': {
+      const task = miniTasks.find((t) => t.id === action.taskId);
+      if (!task) return state;
+      const existing = state.miniTasks[action.taskId] || { status: 'Not Started', versions: [] };
+      const version: MiniTaskSubmissionVersion = {
+        version: existing.versions.length + 1,
+        githubUrl: action.githubUrl,
+        liveUrl: action.liveUrl,
+        notes: action.notes,
+        submittedAt: new Date().toISOString(),
+      };
+      const notifications = pushNotification(state.notifications, `"${task.title}" submitted for review.`, 'success');
+      return {
+        ...state,
+        miniTasks: { ...state.miniTasks, [action.taskId]: { status: 'Under Review', versions: [...existing.versions, version] } },
+        notifications,
+      };
+    }
+
+    case 'EVALUATE_MINI_TASK': {
+      const task = miniTasks.find((t) => t.id === action.taskId);
+      const entry = state.miniTasks[action.taskId];
+      if (!task || !entry) return state;
+      const versionIndex = entry.versions.findIndex((v) => v.version === action.version);
+      if (versionIndex === -1) return state;
+      const evaluation = generateMiniTaskEvaluation(task, action.version);
+      const versions = entry.versions.map((v, i) => (i === versionIndex ? { ...v, evaluation } : v));
+      const notifications = pushNotification(
+        state.notifications,
+        evaluation.outcome === 'Passed'
+          ? `"${task.title}" passed review.`
+          : `Instructor requested changes on "${task.title}".`,
+        evaluation.outcome === 'Passed' ? 'success' : 'warning'
+      );
+      return {
+        ...state,
+        miniTasks: { ...state.miniTasks, [action.taskId]: { status: evaluation.outcome, versions } },
+        notifications,
+      };
+    }
+
+    case 'RECORD_ASSESSMENT_ATTEMPT': {
+      const assessment = assessments.find((a) => a.id === action.assessmentId);
+      if (!assessment) return state;
+      const result: AssessmentScoreResult = scoreAssessmentAttempt(assessment, action.answers);
+      const existing = state.assessments[action.assessmentId] || { attempts: [] };
+      const record = {
+        attemptNo: existing.attempts.length + 1,
+        answers: action.answers,
+        scorePercent: result.scorePercent,
+        passed: result.passed,
+        strongTopics: result.strongTopics,
+        weakTopics: result.weakTopics,
+        date: new Date().toISOString(),
+      };
+      const notifications = pushNotification(
+        state.notifications,
+        `${assessment.title} result: ${result.scorePercent}% — ${result.passed ? 'passed' : 'not yet passed'}.`,
+        result.passed ? 'success' : 'warning'
+      );
+      return {
+        ...state,
+        assessments: { ...state.assessments, [action.assessmentId]: { attempts: [...existing.attempts, record] } },
+        notifications,
+      };
+    }
+
+    case 'ADVANCE_MILESTONE': {
+      const milestoneStatus = { ...state.project.milestoneStatus, [action.milestoneId]: 'completed' as const };
+      if (action.nextMilestoneId) milestoneStatus[action.nextMilestoneId] = 'current';
+      const milestone = majorProject.milestones.find((m) => m.id === action.milestoneId);
+      const notifications = pushNotification(state.notifications, `Milestone "${milestone?.title || ''}" marked complete.`, 'success');
+      return { ...state, project: { ...state.project, milestoneStatus }, notifications };
+    }
+
+    case 'SUBMIT_PROJECT': {
+      const notifications = pushNotification(state.notifications, 'Major Project submitted for final review.', 'success');
+      return {
+        ...state,
+        project: {
+          ...state.project,
+          submission: { githubUrl: action.githubUrl, liveUrl: action.liveUrl, documentationUrl: action.documentationUrl, submittedAt: new Date().toISOString() },
+        },
+        notifications,
+      };
+    }
+
+    default:
+      return state;
+  }
+}
+
+interface AppStateContextValue {
+  state: StudentProgressState;
+  completeLesson: (lessonId: string) => void;
+  completePractice: (practiceId: string) => void;
+  submitCoding: (questionId: string, code: string) => void;
+  submitMiniTask: (taskId: string, githubUrl: string, liveUrl: string, notes: string) => void;
+  submitAssessment: (assessmentId: string, answers: Record<string, number>) => void;
+  advanceMilestone: (milestoneId: string, nextMilestoneId?: string) => void;
+  submitProject: (githubUrl: string, liveUrl: string, documentationUrl: string) => void;
+}
+
+const AppStateContext = createContext<AppStateContextValue | undefined>(undefined);
+
+// Simulates instructor review turnaround: the submission is visibly "Under Review"
+// for a moment before the (mocked) evaluation lands, instead of resolving instantly.
+const MOCK_REVIEW_DELAY_MS = 1800;
+
+export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [state, dispatch] = useReducer(reducer, undefined, createInitialProgressState);
+  const timers = useRef<number[]>([]);
+
+  useEffect(() => () => { timers.current.forEach((t) => window.clearTimeout(t)); }, []);
+
+  const completeLesson = useCallback((lessonId: string) => dispatch({ type: 'COMPLETE_LESSON', lessonId }), []);
+  const completePractice = useCallback((practiceId: string) => dispatch({ type: 'COMPLETE_PRACTICE', practiceId }), []);
+  const submitCoding = useCallback((questionId: string, code: string) => dispatch({ type: 'RECORD_CODING_ATTEMPT', questionId, code }), []);
+
+  const submitMiniTask = useCallback((taskId: string, githubUrl: string, liveUrl: string, notes: string) => {
+    // Capture the version number this submission will become BEFORE dispatching,
+    // so the delayed evaluation targets the right version even if the student
+    // somehow submits again before the mock review completes.
+    const existingVersions = state.miniTasks[taskId]?.versions.length || 0;
+    const versionNumber = existingVersions + 1;
+    dispatch({ type: 'SUBMIT_MINI_TASK', taskId, githubUrl, liveUrl, notes });
+    const timer = window.setTimeout(() => {
+      dispatch({ type: 'EVALUATE_MINI_TASK', taskId, version: versionNumber });
+    }, MOCK_REVIEW_DELAY_MS);
+    timers.current.push(timer);
+  }, [state.miniTasks]);
+
+  const submitAssessment = useCallback((assessmentId: string, answers: Record<string, number>) => dispatch({ type: 'RECORD_ASSESSMENT_ATTEMPT', assessmentId, answers }), []);
+  const advanceMilestone = useCallback((milestoneId: string, nextMilestoneId?: string) => dispatch({ type: 'ADVANCE_MILESTONE', milestoneId, nextMilestoneId }), []);
+  const submitProject = useCallback((githubUrl: string, liveUrl: string, documentationUrl: string) => dispatch({ type: 'SUBMIT_PROJECT', githubUrl, liveUrl, documentationUrl }), []);
+
+  const value = useMemo<AppStateContextValue>(
+    () => ({ state, completeLesson, completePractice, submitCoding, submitMiniTask, submitAssessment, advanceMilestone, submitProject }),
+    [state, completeLesson, completePractice, submitCoding, submitMiniTask, submitAssessment, advanceMilestone, submitProject]
+  );
+
+  return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
+};
+
+export function useAppState(): AppStateContextValue {
+  const ctx = useContext(AppStateContext);
+  if (!ctx) throw new Error('useAppState must be used within AppStateProvider');
+  return ctx;
+}

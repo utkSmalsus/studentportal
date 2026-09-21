@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { useState } from 'react';
 import type { IStudentPortalProps } from './IStudentPortalProps';
+import { AppStateProvider } from '../state/AppStateContext';
 import NavShell from '../navigation/NavShell';
 import { Route } from '../navigation/types';
 import HomePage from './pages/HomePage';
@@ -11,12 +12,13 @@ import ChallengeDetailPage from './pages/ChallengeDetailPage';
 import TasksPage from './pages/TasksPage';
 import TaskDetailPage from './pages/TaskDetailPage';
 import AssessmentDetailPage from './pages/AssessmentDetailPage';
+import AssessmentAttemptPage from './pages/AssessmentAttemptPage';
 import ProjectPage from './pages/ProjectPage';
 import PerformancePage from './pages/PerformancePage';
 import CertificatesPage from './pages/CertificatesPage';
 import ProfilePage from './pages/ProfilePage';
 
-const StudentPortal: React.FC<IStudentPortalProps> = ({ userDisplayName }) => {
+const StudentPortalShell: React.FC<IStudentPortalProps> = ({ userDisplayName }) => {
   const [route, setRoute] = useState<Route>({ view: 'home' });
 
   const renderPage = (): React.ReactElement | null => {
@@ -37,10 +39,12 @@ const StudentPortal: React.FC<IStudentPortalProps> = ({ userDisplayName }) => {
         return <TaskDetailPage taskId={route.taskId} onNavigate={setRoute} />;
       case 'assessmentDetail':
         return <AssessmentDetailPage assessmentId={route.assessmentId} onNavigate={setRoute} />;
+      case 'assessmentAttempt':
+        return <AssessmentAttemptPage assessmentId={route.assessmentId} onNavigate={setRoute} />;
       case 'project':
         return <ProjectPage />;
       case 'performance':
-        return <PerformancePage />;
+        return <PerformancePage onNavigate={setRoute} />;
       case 'certificates':
         return <CertificatesPage />;
       case 'profile':
@@ -56,5 +60,11 @@ const StudentPortal: React.FC<IStudentPortalProps> = ({ userDisplayName }) => {
     </NavShell>
   );
 };
+
+const StudentPortal: React.FC<IStudentPortalProps> = (props) => (
+  <AppStateProvider>
+    <StudentPortalShell {...props} />
+  </AppStateProvider>
+);
 
 export default StudentPortal;

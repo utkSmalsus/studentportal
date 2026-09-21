@@ -1,25 +1,28 @@
-// Realistic, interconnected placeholder data — mini tasks and assessments reference
-// real module ids, the daily-coding feed is independent of the course, and the
-// performance numbers are derived from these same records (see selectors.ts) rather
-// than being separately hand-typed. This is what makes the app feel like one working
-// product instead of disconnected demo screens.
+// Course CONTENT only — never a student's progress. moduleDefs order is the
+// canonical course sequence; the engine (state/engine/progression.ts) combines this
+// with live progress state to compute lock/current/complete status. Swapping this
+// file for a real API/SharePoint List response is the only change needed later.
 import {
   Course,
-  CourseModule,
-  CodingQuestion,
-  WeekDayStatus,
-  MiniTask,
-  Assessment,
-  MajorProject,
-  RecentFeedback,
+  ModuleDef,
+  CodingQuestionDef,
+  MiniTaskDef,
+  AssessmentDef,
+  MajorProjectDef,
   StudentProfile,
 } from './types';
 
 export const course: Course = {
   id: 'mern',
   title: 'MERN Full Stack Development',
-  currentWeek: 9,
-  currentModuleId: 'react-hooks',
+  moduleOrder: [
+    'html', 'css',
+    'js-basics', 'js-intermediate', 'js-advanced',
+    'react', 'react-hooks', 'state-management', 'react-projects',
+    'node', 'express', 'mongodb',
+    'rest-apis', 'authentication', 'deployment',
+    'major-project',
+  ],
 };
 
 export const profile: StudentProfile = {
@@ -29,420 +32,429 @@ export const profile: StudentProfile = {
   joiningDate: '2026-04-01',
 };
 
-export const modules: CourseModule[] = [
+export const moduleDefs: ModuleDef[] = [
   {
-    id: 'html', title: 'HTML', group: 'Foundation', status: 'completed', progressPercent: 100,
+    id: 'html', title: 'HTML', group: 'Foundation', estimatedDuration: '1 week',
     whatYoullLearn: ['Semantic HTML', 'Forms', 'Tables', 'Accessibility basics'],
     learn: [
-      { id: 'html-l1', title: 'Document structure & semantics', status: 'completed' },
-      { id: 'html-l2', title: 'Forms & inputs', status: 'completed' },
+      { id: 'html-l1', title: 'Document structure & semantics', estimatedMinutes: 30 },
+      { id: 'html-l2', title: 'Forms & inputs', estimatedMinutes: 30 },
     ],
     practice: [
-      { id: 'html-p1', title: 'Build a semantic article page', status: 'completed' },
-      { id: 'html-p2', title: 'Build a registration form', status: 'completed' },
+      { id: 'html-p1', title: 'Build a semantic article page', description: 'Structure a blog post using header, article, section and footer.', estimatedMinutes: 40 },
+      { id: 'html-p2', title: 'Build a registration form', description: 'A form with validated inputs and labels.', estimatedMinutes: 40 },
     ],
     miniTaskId: 'task-html',
   },
   {
-    id: 'css', title: 'CSS', group: 'Foundation', status: 'completed', progressPercent: 100,
+    id: 'css', title: 'CSS', group: 'Foundation', estimatedDuration: '1 week',
     whatYoullLearn: ['Box model', 'Flexbox', 'Grid', 'Responsive design'],
     learn: [
-      { id: 'css-l1', title: 'Box model & selectors', status: 'completed' },
-      { id: 'css-l2', title: 'Flexbox & Grid', status: 'completed' },
+      { id: 'css-l1', title: 'Box model & selectors', estimatedMinutes: 30 },
+      { id: 'css-l2', title: 'Flexbox & Grid', estimatedMinutes: 40 },
     ],
-    practice: [
-      { id: 'css-p1', title: 'Build a responsive nav bar', status: 'completed' },
-    ],
+    practice: [{ id: 'css-p1', title: 'Build a responsive nav bar', description: 'A nav bar that collapses on mobile.', estimatedMinutes: 35 }],
     miniTaskId: 'task-css',
     assessmentId: 'assess-html-css',
     prerequisiteModuleId: 'html',
   },
   {
-    id: 'js-basics', title: 'JavaScript Basics', group: 'Programming', status: 'completed', progressPercent: 100,
+    id: 'js-basics', title: 'JavaScript Basics', group: 'Programming', estimatedDuration: '2 weeks',
     whatYoullLearn: ['Variables & data types', 'Operators & conditions', 'Loops', 'Functions'],
     learn: [
-      { id: 'jsb-l1', title: 'Variables, types & operators', status: 'completed' },
-      { id: 'jsb-l2', title: 'Conditions & loops', status: 'completed' },
-      { id: 'jsb-l3', title: 'Functions', status: 'completed' },
+      { id: 'jsb-l1', title: 'Variables, types & operators', estimatedMinutes: 35 },
+      { id: 'jsb-l2', title: 'Conditions & loops', estimatedMinutes: 35 },
+      { id: 'jsb-l3', title: 'Functions', estimatedMinutes: 30 },
     ],
     practice: [
-      { id: 'jsb-p1', title: 'FizzBuzz & loop drills', status: 'completed' },
-      { id: 'jsb-p2', title: 'Function exercises', status: 'completed' },
+      { id: 'jsb-p1', title: 'FizzBuzz & loop drills', description: 'Classic loop and condition warm-ups.', estimatedMinutes: 30 },
+      { id: 'jsb-p2', title: 'Function exercises', description: 'Write small reusable functions.', estimatedMinutes: 30 },
     ],
     assessmentId: 'assess-js-basics',
     prerequisiteModuleId: 'css',
   },
   {
-    id: 'js-intermediate', title: 'JavaScript Intermediate', group: 'Programming', status: 'completed', progressPercent: 100,
+    id: 'js-intermediate', title: 'JavaScript Intermediate', group: 'Programming', estimatedDuration: '2 weeks',
     whatYoullLearn: ['Array methods', 'Object manipulation', 'Destructuring', 'Spread / rest', 'Higher-order functions'],
     learn: [
-      { id: 'jsi-l1', title: 'Array methods (map, filter, reduce)', status: 'completed' },
-      { id: 'jsi-l2', title: 'Objects, destructuring & spread', status: 'completed' },
-      { id: 'jsi-l3', title: 'Higher-order functions', status: 'completed' },
+      { id: 'jsi-l1', title: 'Array methods (map, filter, reduce)', estimatedMinutes: 40 },
+      { id: 'jsi-l2', title: 'Objects, destructuring & spread', estimatedMinutes: 35 },
+      { id: 'jsi-l3', title: 'Higher-order functions', estimatedMinutes: 30 },
     ],
     practice: [
-      { id: 'jsi-p1', title: 'Array method drills', status: 'completed' },
-      { id: 'jsi-p2', title: 'Object transformation exercises', status: 'completed' },
-      { id: 'jsi-p3', title: 'Build a small utility library', status: 'completed' },
+      { id: 'jsi-p1', title: 'Array method drills', description: 'map/filter/reduce practice set.', estimatedMinutes: 35 },
+      { id: 'jsi-p2', title: 'Object transformation exercises', description: 'Reshape and merge objects.', estimatedMinutes: 30 },
+      { id: 'jsi-p3', title: 'Build a small utility library', description: 'chunk, unique, groupBy, flatten.', estimatedMinutes: 45 },
     ],
     miniTaskId: 'task-js-utils',
     assessmentId: 'assess-js-intermediate',
     prerequisiteModuleId: 'js-basics',
   },
   {
-    id: 'js-advanced', title: 'JavaScript Advanced', group: 'Programming', status: 'completed', progressPercent: 100,
+    id: 'js-advanced', title: 'JavaScript Advanced', group: 'Programming', estimatedDuration: '2 weeks',
     whatYoullLearn: ['Closures', 'The event loop', 'Promises & async/await', 'Debouncing & throttling'],
     learn: [
-      { id: 'jsa-l1', title: 'Closures & scope', status: 'completed' },
-      { id: 'jsa-l2', title: 'The event loop', status: 'completed' },
-      { id: 'jsa-l3', title: 'Promises & async/await', status: 'completed' },
+      { id: 'jsa-l1', title: 'Closures & scope', estimatedMinutes: 35 },
+      { id: 'jsa-l2', title: 'The event loop', estimatedMinutes: 35 },
+      { id: 'jsa-l3', title: 'Promises & async/await', estimatedMinutes: 40 },
     ],
-    practice: [
-      { id: 'jsa-p1', title: 'Closure & async drills', status: 'completed' },
-    ],
+    practice: [{ id: 'jsa-p1', title: 'Closure & async drills', description: 'Write closures and async helpers.', estimatedMinutes: 40 }],
     assessmentId: 'assess-js-advanced',
     prerequisiteModuleId: 'js-intermediate',
   },
   {
-    id: 'react', title: 'React', group: 'Frontend', status: 'completed', progressPercent: 100,
+    id: 'react', title: 'React', group: 'Frontend', estimatedDuration: '2 weeks',
     whatYoullLearn: ['Components & props', 'State', 'Rendering & the virtual DOM'],
     learn: [
-      { id: 'react-l1', title: 'Components & props', status: 'completed' },
-      { id: 'react-l2', title: 'State & events', status: 'completed' },
+      { id: 'react-l1', title: 'Components & props', estimatedMinutes: 35 },
+      { id: 'react-l2', title: 'State & events', estimatedMinutes: 35 },
     ],
-    practice: [
-      { id: 'react-p1', title: 'Build a component library', status: 'completed' },
-    ],
+    practice: [{ id: 'react-p1', title: 'Build a component library', description: 'Small prop-driven UI components.', estimatedMinutes: 45 }],
     miniTaskId: 'task-react-components',
     assessmentId: 'assess-react',
     prerequisiteModuleId: 'js-advanced',
   },
   {
-    id: 'react-hooks', title: 'React Hooks', group: 'Frontend', status: 'current', progressPercent: 65,
+    id: 'react-hooks', title: 'React Hooks', group: 'Frontend', estimatedDuration: '2 weeks',
     whatYoullLearn: ['useState & useEffect', 'Custom hooks', 'Forms with hooks', 'Data fetching'],
     learn: [
-      { id: 'rh-l1', title: 'useState & useEffect', status: 'completed' },
-      { id: 'rh-l2', title: 'Custom hooks', status: 'completed' },
-      { id: 'rh-l3', title: 'Data fetching patterns', status: 'current' },
+      { id: 'rh-l1', title: 'useState & useEffect', estimatedMinutes: 35 },
+      { id: 'rh-l2', title: 'Custom hooks', estimatedMinutes: 35 },
+      { id: 'rh-l3', title: 'Data fetching patterns', estimatedMinutes: 40 },
     ],
     practice: [
-      { id: 'rh-p1', title: 'Build a useLocalStorage hook', status: 'completed' },
-      { id: 'rh-p2', title: 'Build a useFetch hook', status: 'current' },
+      { id: 'rh-p1', title: 'Build a useLocalStorage hook', description: 'Persist state to localStorage.', estimatedMinutes: 35 },
+      { id: 'rh-p2', title: 'Build a useFetch hook', description: 'Reusable data-fetching hook.', estimatedMinutes: 40 },
     ],
     miniTaskId: 'task-react-todo',
     assessmentId: 'assess-react-hooks',
     prerequisiteModuleId: 'react',
   },
   {
-    id: 'state-management', title: 'State Management', group: 'Frontend', status: 'upcoming', progressPercent: 0,
+    id: 'state-management', title: 'State Management', group: 'Frontend', estimatedDuration: '1 week',
     whatYoullLearn: ['Context API', 'Lifting state up', 'Intro to external state libraries'],
-    learn: [{ id: 'sm-l1', title: 'Context API', status: 'upcoming' }],
-    practice: [{ id: 'sm-p1', title: 'Global theme/auth context', status: 'upcoming' }],
+    learn: [{ id: 'sm-l1', title: 'Context API', estimatedMinutes: 30 }],
+    practice: [{ id: 'sm-p1', title: 'Global theme/auth context', description: 'Share state across the app with Context.', estimatedMinutes: 35 }],
     prerequisiteModuleId: 'react-hooks',
   },
   {
-    id: 'react-projects', title: 'React Projects', group: 'Frontend', status: 'locked', progressPercent: 0,
+    id: 'react-projects', title: 'React Projects', group: 'Frontend', estimatedDuration: '2 weeks',
     whatYoullLearn: ['Combining hooks, context and routing into a real app'],
-    learn: [{ id: 'rp-l1', title: 'Routing with React Router', status: 'upcoming' }],
-    practice: [{ id: 'rp-p1', title: 'Multi-page project', status: 'upcoming' }],
+    learn: [{ id: 'rp-l1', title: 'Routing with React Router', estimatedMinutes: 35 }],
+    practice: [{ id: 'rp-p1', title: 'Multi-page project', description: 'A small multi-route React app.', estimatedMinutes: 60 }],
     prerequisiteModuleId: 'state-management',
   },
   {
-    id: 'node', title: 'Node.js', group: 'Backend', status: 'locked', progressPercent: 0,
+    id: 'node', title: 'Node.js', group: 'Backend', estimatedDuration: '2 weeks',
     whatYoullLearn: ['Node runtime & modules', 'npm', 'File system & streams'],
-    learn: [{ id: 'node-l1', title: 'Node fundamentals', status: 'upcoming' }],
-    practice: [{ id: 'node-p1', title: 'Build a CLI tool', status: 'upcoming' }],
+    learn: [
+      { id: 'node-l1', title: 'Node fundamentals', estimatedMinutes: 30 },
+      { id: 'node-l2', title: 'Modules & npm', estimatedMinutes: 30 },
+      { id: 'node-l3', title: 'File system & streams', estimatedMinutes: 35 },
+    ],
+    practice: [
+      { id: 'node-p1', title: 'Build a CLI tool', description: 'Read and transform a local file from the command line.', estimatedMinutes: 45 },
+      { id: 'node-p2', title: 'Read & write JSON files', description: 'Persist small CLI state to disk.', estimatedMinutes: 30 },
+    ],
     miniTaskId: 'task-node-cli',
     assessmentId: 'assess-node',
     prerequisiteModuleId: 'react-projects',
   },
   {
-    id: 'express', title: 'Express.js', group: 'Backend', status: 'locked', progressPercent: 0,
+    id: 'express', title: 'Express.js', group: 'Backend', estimatedDuration: '2 weeks',
     whatYoullLearn: ['Routing', 'Middleware', 'Error handling'],
-    learn: [{ id: 'exp-l1', title: 'Routing & middleware', status: 'upcoming' }],
-    practice: [{ id: 'exp-p1', title: 'Build a small REST server', status: 'upcoming' }],
+    learn: [{ id: 'exp-l1', title: 'Routing & middleware', estimatedMinutes: 35 }],
+    practice: [{ id: 'exp-p1', title: 'Build a small REST server', description: 'CRUD routes with Express.', estimatedMinutes: 45 }],
     miniTaskId: 'task-express-api',
     prerequisiteModuleId: 'node',
   },
   {
-    id: 'mongodb', title: 'MongoDB', group: 'Backend', status: 'locked', progressPercent: 0,
+    id: 'mongodb', title: 'MongoDB', group: 'Backend', estimatedDuration: '1 week',
     whatYoullLearn: ['Documents & collections', 'CRUD', 'Mongoose schemas'],
-    learn: [{ id: 'mongo-l1', title: 'Documents, collections & CRUD', status: 'upcoming' }],
-    practice: [{ id: 'mongo-p1', title: 'Model a small app schema', status: 'upcoming' }],
+    learn: [{ id: 'mongo-l1', title: 'Documents, collections & CRUD', estimatedMinutes: 35 }],
+    practice: [{ id: 'mongo-p1', title: 'Model a small app schema', description: 'Design a Mongoose schema.', estimatedMinutes: 35 }],
     miniTaskId: 'task-mongo-schema',
     prerequisiteModuleId: 'express',
   },
   {
-    id: 'rest-apis', title: 'REST APIs', group: 'Full Stack', status: 'locked', progressPercent: 0,
+    id: 'rest-apis', title: 'REST APIs', group: 'Full Stack', estimatedDuration: '1 week',
     whatYoullLearn: ['API design', 'Status codes', 'Connecting frontend to backend'],
-    learn: [{ id: 'rest-l1', title: 'API design principles', status: 'upcoming' }],
-    practice: [{ id: 'rest-p1', title: 'Connect React app to Express API', status: 'upcoming' }],
+    learn: [{ id: 'rest-l1', title: 'API design principles', estimatedMinutes: 30 }],
+    practice: [{ id: 'rest-p1', title: 'Connect React app to Express API', description: 'Wire the frontend to real endpoints.', estimatedMinutes: 45 }],
     prerequisiteModuleId: 'mongodb',
   },
   {
-    id: 'authentication', title: 'Authentication', group: 'Full Stack', status: 'locked', progressPercent: 0,
+    id: 'authentication', title: 'Authentication', group: 'Full Stack', estimatedDuration: '1 week',
     whatYoullLearn: ['JWT', 'Sessions', 'Protecting routes'],
-    learn: [{ id: 'auth-l1', title: 'JWT & sessions', status: 'upcoming' }],
-    practice: [{ id: 'auth-p1', title: 'Add login/signup to your app', status: 'upcoming' }],
+    learn: [{ id: 'auth-l1', title: 'JWT & sessions', estimatedMinutes: 35 }],
+    practice: [{ id: 'auth-p1', title: 'Add login/signup to your app', description: 'Protect routes with JWT.', estimatedMinutes: 45 }],
     prerequisiteModuleId: 'rest-apis',
   },
   {
-    id: 'deployment', title: 'Deployment', group: 'Full Stack', status: 'locked', progressPercent: 0,
+    id: 'deployment', title: 'Deployment', group: 'Full Stack', estimatedDuration: '1 week',
     whatYoullLearn: ['Environment configs', 'Hosting frontend & backend', 'CI basics'],
-    learn: [{ id: 'dep-l1', title: 'Hosting & environment configs', status: 'upcoming' }],
-    practice: [{ id: 'dep-p1', title: 'Deploy a full stack app', status: 'upcoming' }],
+    learn: [{ id: 'dep-l1', title: 'Hosting & environment configs', estimatedMinutes: 30 }],
+    practice: [{ id: 'dep-p1', title: 'Deploy a full stack app', description: 'Ship frontend and backend live.', estimatedMinutes: 45 }],
     prerequisiteModuleId: 'authentication',
   },
   {
-    id: 'major-project', title: 'Major Project', group: 'Capstone', status: 'locked', progressPercent: 0,
-    whatYoullLearn: ['Bringing every module together into one real application'],
+    id: 'major-project', title: 'Major Project', group: 'Capstone', estimatedDuration: '3 weeks',
+    whatYoullLearn: ['Bringing your frontend and backend skills together into one real application'],
     learn: [], practice: [],
-    prerequisiteModuleId: 'deployment',
+    // Unlocks once Frontend is complete, not after the whole course — the capstone
+    // runs in parallel with Backend/Full Stack, which is how the coaching center
+    // actually schedules it.
+    prerequisiteModuleId: 'react-projects',
   },
 ];
 
 // ---- Daily Coding ----
 
-export const codingQuestions: CodingQuestion[] = [
+export const codingQuestions: CodingQuestionDef[] = [
   {
     id: 'q1', day: 1, title: 'Reverse a String', difficulty: 'Beginner', topic: 'Strings', tags: ['Strings'],
-    status: 'solved', problemStatement: 'Given a string, return it reversed.', exampleInput: '"hello"', exampleOutput: '"olleh"',
-    constraints: ['1 <= s.length <= 10^4'], testCasesTotal: 6, testCasesPassed: 6, scorePercent: 100, timeComplexity: 'O(n)',
+    problemStatement: 'Given a string, return it reversed.', exampleInput: '"hello"', exampleOutput: '"olleh"',
+    constraints: ['1 <= s.length <= 10^4'], hints: ['Try splitting the string into characters first.'],
+    testCasesTotal: 6, keywordChecks: ['split', 'reverse', 'join'],
   },
   {
     id: 'q2', day: 10, title: 'Count Vowels', difficulty: 'Beginner', topic: 'Strings', tags: ['Strings'],
-    status: 'solved', problemStatement: 'Count the number of vowels in a string.', exampleInput: '"coaching"', exampleOutput: '3',
-    constraints: [], testCasesTotal: 5, testCasesPassed: 5, scorePercent: 100, timeComplexity: 'O(n)',
+    problemStatement: 'Count the number of vowels in a string.', exampleInput: '"coaching"', exampleOutput: '3',
+    constraints: [], hints: ['A simple loop with an includes() check works well.'],
+    testCasesTotal: 5, keywordChecks: ['vowel', 'includes', 'for'],
   },
   {
     id: 'q3', day: 20, title: 'Find the Largest Number', difficulty: 'Beginner', topic: 'Arrays', tags: ['Arrays'],
-    status: 'solved', problemStatement: 'Return the largest number in an array.', exampleInput: '[3,9,2]', exampleOutput: '9',
-    constraints: [], testCasesTotal: 5, testCasesPassed: 5, scorePercent: 100, timeComplexity: 'O(n)',
+    problemStatement: 'Return the largest number in an array.', exampleInput: '[3,9,2]', exampleOutput: '9',
+    constraints: [], hints: ['Math.max with spread is the shortest solution.'],
+    testCasesTotal: 5, keywordChecks: ['max', 'reduce'],
   },
   {
     id: 'q4', day: 30, title: 'Two Sum', difficulty: 'Beginner', topic: 'Arrays', tags: ['Arrays', 'Hash Map'],
-    status: 'solved', problemStatement: 'Return indices of the two numbers that add up to a target.', exampleInput: '[2,7,11,15], target=9', exampleOutput: '[0,1]',
-    constraints: [], testCasesTotal: 8, testCasesPassed: 8, scorePercent: 100, timeComplexity: 'O(n)',
+    problemStatement: 'Return indices of the two numbers that add up to a target.', exampleInput: '[2,7,11,15], target=9', exampleOutput: '[0,1]',
+    constraints: [], hints: ['A hash map gets you from O(n²) to O(n).'],
+    testCasesTotal: 8, keywordChecks: ['map', 'indexof', 'has'],
   },
   {
     id: 'q5', day: 38, title: 'Balanced Parentheses', difficulty: 'Intermediate', topic: 'Stacks', tags: ['Stacks'],
-    status: 'failed', problemStatement: 'Check whether a string of brackets is balanced.', exampleInput: '"([)]"', exampleOutput: 'false',
-    constraints: [], testCasesTotal: 6, testCasesPassed: 3, scorePercent: 50, timeComplexity: 'O(n)',
-    feedback: 'Your solution fails on mismatched bracket order — a closing bracket must match the most recent unmatched opening bracket.',
+    problemStatement: 'Check whether a string of brackets is balanced.', exampleInput: '"([)]"', exampleOutput: 'false',
+    constraints: [], hints: ['A stack naturally matches the most recent unmatched opening bracket.'],
+    testCasesTotal: 6, keywordChecks: ['stack', 'push', 'pop'],
   },
   {
     id: 'q6', day: 45, title: 'Group Objects by Key', difficulty: 'Intermediate', topic: 'Objects', tags: ['Objects', 'Arrays'],
-    status: 'solved', problemStatement: 'Group an array of objects by a given key.', exampleInput: '[{team:"A"},{team:"B"},{team:"A"}]', exampleOutput: '{A:[...], B:[...]}',
-    constraints: [], testCasesTotal: 6, testCasesPassed: 6, scorePercent: 100, timeComplexity: 'O(n)',
+    problemStatement: 'Group an array of objects by a given key.', exampleInput: '[{team:"A"},{team:"B"},{team:"A"}]', exampleOutput: '{A:[...], B:[...]}',
+    constraints: [], hints: ['reduce() into an accumulator object keyed by the field.'],
+    testCasesTotal: 6, keywordChecks: ['reduce', 'key'],
   },
   {
     id: 'q7', day: 47, title: 'Flatten a Nested Array', difficulty: 'Intermediate', topic: 'Arrays', tags: ['Arrays', 'Recursion'],
-    status: 'today', problemStatement: 'Given a nested array, return a single flattened array.', exampleInput: '[1,[2,[3,4]],5]', exampleOutput: '[1,2,3,4,5]',
-    constraints: ['Array can be nested to arbitrary depth.'], testCasesTotal: 8,
+    problemStatement: 'Given a nested array, return a single flattened array.', exampleInput: '[1,[2,[3,4]],5]', exampleOutput: '[1,2,3,4,5]',
+    constraints: ['Array can be nested to arbitrary depth.'], hints: ['Array.isArray() plus recursion, or Array.prototype.flat(Infinity).'],
+    testCasesTotal: 8, keywordChecks: ['isarray', 'flat', 'concat', 'recur'],
   },
-  { id: 'q8', day: 60, title: 'Recursion Basics', difficulty: 'Intermediate', topic: 'Recursion', tags: ['Recursion'], status: 'pending', problemStatement: '', exampleInput: '', exampleOutput: '', constraints: [], testCasesTotal: 6 },
-  { id: 'q9', day: 100, title: 'Debouncing', difficulty: 'Advanced', topic: 'Functions', tags: ['Functions', 'Timing'], status: 'pending', problemStatement: '', exampleInput: '', exampleOutput: '', constraints: [], testCasesTotal: 6 },
-  { id: 'q10', day: 120, title: 'Promise.all from Scratch', difficulty: 'Advanced', topic: 'Async', tags: ['Promises'], status: 'pending', problemStatement: '', exampleInput: '', exampleOutput: '', constraints: [], testCasesTotal: 6 },
-];
-
-export const codingStreak = { current: 12, best: 21, dayNumber: 47 };
-
-export const codingWeek: WeekDayStatus[] = [
-  { day: 'Mon', status: 'solved' },
-  { day: 'Tue', status: 'solved' },
-  { day: 'Wed', status: 'solved' },
-  { day: 'Thu', status: 'solved' },
-  { day: 'Fri', status: 'today' },
-  { day: 'Sat', status: 'upcoming' },
-  { day: 'Sun', status: 'upcoming' },
+  {
+    id: 'q8', day: 60, title: 'Recursion Basics', difficulty: 'Intermediate', topic: 'Recursion', tags: ['Recursion'],
+    problemStatement: 'Compute the factorial of n using recursion.', exampleInput: 'n=5', exampleOutput: '120',
+    constraints: ['0 <= n <= 12'], hints: ['Define the base case first.'],
+    testCasesTotal: 6, keywordChecks: ['return', 'function'],
+  },
+  {
+    id: 'q9', day: 100, title: 'Debouncing', difficulty: 'Advanced', topic: 'Functions', tags: ['Functions', 'Timing'],
+    problemStatement: 'Implement a debounce(fn, delay) higher-order function.', exampleInput: 'debounce(fn, 300)', exampleOutput: 'a function that delays calls to fn',
+    constraints: [], hints: ['setTimeout + clearTimeout on every call.'],
+    testCasesTotal: 6, keywordChecks: ['settimeout', 'cleartimeout'],
+  },
+  {
+    id: 'q10', day: 120, title: 'Promise.all from Scratch', difficulty: 'Advanced', topic: 'Async', tags: ['Promises'],
+    problemStatement: 'Implement a simplified version of Promise.all.', exampleInput: '[p1, p2, p3]', exampleOutput: 'a Promise that resolves with all results, or rejects on the first failure',
+    constraints: [], hints: ['Track a results array and a remaining counter.'],
+    testCasesTotal: 6, keywordChecks: ['promise', 'resolve', 'reject'],
+  },
 ];
 
 // ---- Mini Tasks ----
 
-export const miniTasks: MiniTask[] = [
+const standardFrontendCriteria = [
+  { label: 'Code Quality', maxScore: 10 },
+  { label: 'Functionality', maxScore: 10 },
+  { label: 'UI / UX', maxScore: 10 },
+  { label: 'Architecture', maxScore: 10 },
+  { label: 'Best Practices', maxScore: 10 },
+];
+const standardBackendCriteria = [
+  { label: 'Code Quality', maxScore: 10 },
+  { label: 'Functionality', maxScore: 10 },
+  { label: 'Error Handling', maxScore: 10 },
+  { label: 'Architecture', maxScore: 10 },
+  { label: 'Best Practices', maxScore: 10 },
+];
+
+export const miniTasks: MiniTaskDef[] = [
   {
     id: 'task-html', title: 'Build a Responsive Portfolio', moduleId: 'html', difficulty: 'Beginner', estimatedDuration: '2 days', deadline: '2026-05-08',
     objective: 'Build a personal portfolio page using semantic HTML and CSS.', skills: ['HTML', 'CSS'],
-    requirements: [
-      { label: 'Semantic page structure', done: true },
-      { label: 'About + projects sections', done: true },
-      { label: 'Contact form', done: true },
-    ],
-    status: 'Passed',
-    submission: { githubUrl: 'https://github.com/rahul/portfolio', liveUrl: 'https://rahul-portfolio.example.com', notes: '' },
-    evaluation: { status: 'Approved', evaluatedAt: '2026-05-06', feedback: 'Clean structure and good use of semantic tags.', criteria: [
-      { label: 'Code Quality', score: 9, maxScore: 10 },
-      { label: 'Functionality', score: 9, maxScore: 10 },
-      { label: 'UI / UX', score: 8, maxScore: 10 },
-    ] },
+    requirements: ['Semantic page structure', 'About + projects sections', 'Contact form'],
+    resources: ['MDN: Semantic HTML', 'Course reading: Accessible forms'],
+    evaluationCriteriaTemplate: standardFrontendCriteria,
   },
   {
     id: 'task-css', title: 'Build a Responsive Landing Page', moduleId: 'css', difficulty: 'Beginner', estimatedDuration: '2 days', deadline: '2026-05-20',
     objective: 'Build a fully responsive landing page using Flexbox and Grid.', skills: ['CSS', 'Responsive Design'],
-    requirements: [
-      { label: 'Mobile-first layout', done: true },
-      { label: 'Flexbox/Grid based sections', done: true },
-    ],
-    status: 'Passed',
-    submission: { githubUrl: 'https://github.com/rahul/landing-page', liveUrl: 'https://rahul-landing.example.com', notes: '' },
-    evaluation: { status: 'Approved', evaluatedAt: '2026-05-18', feedback: 'Good responsive behavior across breakpoints.', criteria: [
-      { label: 'Code Quality', score: 8, maxScore: 10 },
-      { label: 'Responsiveness', score: 9, maxScore: 10 },
-      { label: 'UI / UX', score: 8, maxScore: 10 },
-    ] },
+    requirements: ['Mobile-first layout', 'Flexbox/Grid based sections'],
+    resources: ['MDN: CSS Grid', 'MDN: Flexbox'],
+    evaluationCriteriaTemplate: standardFrontendCriteria,
   },
   {
     id: 'task-js-utils', title: 'Build an Array Utility Library', moduleId: 'js-intermediate', difficulty: 'Intermediate', estimatedDuration: '3 days', deadline: '2026-06-14',
     objective: 'Build a small library of array utility functions (chunk, unique, groupBy, flatten).', skills: ['JavaScript', 'Array Methods'],
-    requirements: [
-      { label: 'chunk()', done: true },
-      { label: 'unique()', done: true },
-      { label: 'groupBy()', done: true },
-      { label: 'flatten()', done: true },
-    ],
-    status: 'Passed',
-    submission: { githubUrl: 'https://github.com/rahul/array-utils', liveUrl: '', notes: '' },
-    evaluation: { status: 'Approved', evaluatedAt: '2026-06-13', feedback: 'Solid implementation with good test coverage.', criteria: [
-      { label: 'Code Quality', score: 9, maxScore: 10 },
-      { label: 'Functionality', score: 10, maxScore: 10 },
-      { label: 'Test Coverage', score: 8, maxScore: 10 },
-    ] },
+    requirements: ['chunk()', 'unique()', 'groupBy()', 'flatten()'],
+    resources: ['MDN: Array methods reference'],
+    evaluationCriteriaTemplate: standardBackendCriteria,
   },
   {
     id: 'task-react-components', title: 'Build a Reusable Component Library', moduleId: 'react', difficulty: 'Intermediate', estimatedDuration: '3 days', deadline: '2026-07-10',
     objective: 'Build a small set of reusable, prop-driven React components (Button, Card, Modal, Input).', skills: ['React', 'Component Design'],
-    requirements: [
-      { label: 'Button, Card, Modal, Input', done: true },
-      { label: 'Prop-driven variants', done: true },
-    ],
-    status: 'Passed',
-    submission: { githubUrl: 'https://github.com/rahul/ui-kit', liveUrl: 'https://rahul-ui-kit.example.com', notes: '' },
-    evaluation: { status: 'Approved', evaluatedAt: '2026-07-09', feedback: 'Well-structured, reusable components.', criteria: [
-      { label: 'Code Quality', score: 8, maxScore: 10 },
-      { label: 'React Usage', score: 9, maxScore: 10 },
-      { label: 'Architecture', score: 8, maxScore: 10 },
-    ] },
+    requirements: ['Button, Card, Modal, Input', 'Prop-driven variants'],
+    resources: ['React docs: Thinking in React'],
+    evaluationCriteriaTemplate: standardFrontendCriteria,
   },
   {
     id: 'task-react-todo', title: 'Build a React Todo Application', moduleId: 'react-hooks', difficulty: 'Intermediate', estimatedDuration: '3 days', deadline: '2026-09-28',
     objective: 'Build a Todo application using React Hooks.', skills: ['React', 'State Management', 'Component Architecture'],
-    requirements: [
-      { label: 'Add Todo', done: true },
-      { label: 'Delete Todo', done: true },
-      { label: 'Mark Complete', done: true },
-      { label: 'Filtering', done: true },
-      { label: 'Persistence', done: true },
-    ],
-    status: 'Changes Requested',
-    submission: { githubUrl: 'https://github.com/rahul/react-todo', liveUrl: 'https://rahul-todo.example.com', notes: 'Used localStorage for persistence.' },
-    evaluation: {
-      status: 'Changes Requested', evaluatedAt: '2026-09-26',
-      feedback: 'Good implementation. Filtering logic should be extracted into a reusable hook. Also improve error handling.',
-      criteria: [
-        { label: 'Code Quality', score: 8, maxScore: 10 },
-        { label: 'React Usage', score: 9, maxScore: 10 },
-        { label: 'UI / UX', score: 8, maxScore: 10 },
-        { label: 'Architecture', score: 8, maxScore: 10 },
-        { label: 'Best Practices', score: 8, maxScore: 10 },
-      ],
-    },
+    requirements: ['Add Todo', 'Delete Todo', 'Mark Complete', 'Filtering', 'Persistence'],
+    resources: ['React docs: useState', 'React docs: useEffect'],
+    evaluationCriteriaTemplate: standardFrontendCriteria,
   },
   {
-    id: 'task-node-cli', title: 'Build a Node CLI Tool', moduleId: 'node', difficulty: 'Intermediate', estimatedDuration: '2 days', deadline: '2026-10-20',
+    id: 'task-node-cli', title: 'Build a Node CLI Tool', moduleId: 'node', difficulty: 'Intermediate', estimatedDuration: '2 days', deadline: '2026-11-02',
     objective: 'Build a command-line tool that reads and transforms a local file.', skills: ['Node.js', 'File System'],
-    requirements: [
-      { label: 'Read from file system', done: true },
-      { label: 'Transform + write output', done: true },
-    ],
-    status: 'Under Review',
-    submission: { githubUrl: 'https://github.com/rahul/node-cli', liveUrl: '', notes: '' },
+    requirements: ['Read from file system', 'Transform + write output', 'Handle a missing-file error gracefully'],
+    resources: ['Node docs: fs module'],
+    evaluationCriteriaTemplate: standardBackendCriteria,
   },
-  { id: 'task-express-api', title: 'Build a REST API', moduleId: 'express', difficulty: 'Advanced', estimatedDuration: '3 days', deadline: '2026-11-05', objective: 'Build a CRUD REST API with Express.', skills: ['Express', 'REST'], requirements: [], status: 'Not Started' },
-  { id: 'task-mongo-schema', title: 'Model a MongoDB Schema', moduleId: 'mongodb', difficulty: 'Intermediate', estimatedDuration: '2 days', deadline: '2026-11-20', objective: 'Design and implement a Mongoose schema for a small app.', skills: ['MongoDB', 'Mongoose'], requirements: [], status: 'Not Started' },
+  {
+    id: 'task-express-api', title: 'Build a REST API', moduleId: 'express', difficulty: 'Advanced', estimatedDuration: '3 days', deadline: '2026-11-20',
+    objective: 'Build a CRUD REST API with Express.', skills: ['Express', 'REST'],
+    requirements: ['GET/POST/PUT/DELETE routes', 'Input validation', 'Centralized error handling'],
+    resources: ['Express docs: Routing'],
+    evaluationCriteriaTemplate: standardBackendCriteria,
+  },
+  {
+    id: 'task-mongo-schema', title: 'Model a MongoDB Schema', moduleId: 'mongodb', difficulty: 'Intermediate', estimatedDuration: '2 days', deadline: '2026-12-02',
+    objective: 'Design and implement a Mongoose schema for a small app.', skills: ['MongoDB', 'Mongoose'],
+    requirements: ['Schema with validation', 'At least one relationship (ref)', 'Seed script'],
+    resources: ['Mongoose docs: Schemas'],
+    evaluationCriteriaTemplate: standardBackendCriteria,
+  },
 ];
 
-// ---- Assessments ----
+// ---- Assessments (5 questions each — enough to demo a real attempt flow) ----
 
-export const assessments: Assessment[] = [
+export const assessments: AssessmentDef[] = [
   {
     id: 'assess-html-css', title: 'HTML & CSS Fundamentals', moduleId: 'css', topics: ['HTML', 'CSS', 'Responsive Design'],
-    totalQuestions: 25, timeLimitMinutes: 30, passingScorePercent: 60, attemptsAllowed: 2,
-    attempts: [{ attemptNo: 1, scorePercent: 92, date: '2026-05-19' }], status: 'passed',
-    strongAreas: ['Selectors', 'Flexbox'], needsImprovement: [],
+    timeLimitMinutes: 15, passingScorePercent: 60, attemptsAllowed: 2,
+    questions: [
+      { id: 'hc1', topic: 'HTML', text: 'Which tag is used for the most important heading?', options: ['<h1>', '<h6>', '<head>', '<title>'], correctIndex: 0 },
+      { id: 'hc2', topic: 'CSS', text: 'Which property changes text color?', options: ['color', 'background-color', 'font-color', 'text-color'], correctIndex: 0 },
+      { id: 'hc3', topic: 'CSS', text: 'Which display value creates a flex container?', options: ['flex', 'block', 'inline', 'static'], correctIndex: 0 },
+      { id: 'hc4', topic: 'Responsive Design', text: 'Which CSS feature adapts layout to screen width?', options: ['Media queries', 'Pseudo-classes', 'Keyframes', 'Transitions'], correctIndex: 0 },
+      { id: 'hc5', topic: 'HTML', text: 'Which attribute provides alternative text for images?', options: ['alt', 'title', 'src', 'longdesc'], correctIndex: 0 },
+    ],
   },
   {
     id: 'assess-js-basics', title: 'JavaScript Basics', moduleId: 'js-basics', topics: ['Variables', 'Loops', 'Functions'],
-    totalQuestions: 25, timeLimitMinutes: 30, passingScorePercent: 60, attemptsAllowed: 2,
-    attempts: [{ attemptNo: 1, scorePercent: 82, date: '2026-05-28' }], status: 'passed',
-    strongAreas: ['Loops', 'Functions'], needsImprovement: [],
+    timeLimitMinutes: 15, passingScorePercent: 60, attemptsAllowed: 2,
+    questions: [
+      { id: 'jb1', topic: 'Variables', text: 'Which keyword declares a block-scoped variable?', options: ['let', 'var', 'function', 'static'], correctIndex: 0 },
+      { id: 'jb2', topic: 'Loops', text: 'Which loop runs at least once?', options: ['do...while', 'for', 'while', 'for...of'], correctIndex: 0 },
+      { id: 'jb3', topic: 'Functions', text: 'What does a function without a return statement return?', options: ['undefined', 'null', '0', 'an error'], correctIndex: 0 },
+      { id: 'jb4', topic: 'Variables', text: 'Which of these is NOT a primitive type?', options: ['object', 'string', 'number', 'boolean'], correctIndex: 0 },
+      { id: 'jb5', topic: 'Loops', text: 'Which statement exits a loop early?', options: ['break', 'continue', 'return', 'exit'], correctIndex: 0 },
+    ],
   },
   {
     id: 'assess-js-intermediate', title: 'JavaScript Intermediate', moduleId: 'js-intermediate', topics: ['Arrays', 'Objects', 'Closures', 'Async JavaScript'],
-    totalQuestions: 30, timeLimitMinutes: 45, passingScorePercent: 60, attemptsAllowed: 2,
-    attempts: [
-      { attemptNo: 1, scorePercent: 68, date: '2026-06-12' },
-      { attemptNo: 2, scorePercent: 74, date: '2026-06-15' },
+    timeLimitMinutes: 20, passingScorePercent: 60, attemptsAllowed: 2,
+    questions: [
+      { id: 'ji1', topic: 'Arrays', text: 'Which array method creates a new array from transformed elements?', options: ['map', 'forEach', 'filter', 'reduce'], correctIndex: 0 },
+      { id: 'ji2', topic: 'Objects', text: 'Which syntax extracts properties into variables?', options: ['Destructuring', 'Spread', 'Rest', 'Closures'], correctIndex: 0 },
+      { id: 'ji3', topic: 'Closures', text: 'A closure is formed when...', options: ['a function retains access to its outer scope after that scope has returned', 'a function calls itself', 'two functions share a global variable', 'an object inherits from a prototype'], correctIndex: 0 },
+      { id: 'ji4', topic: 'Async JavaScript', text: 'What does `await` do inside an async function?', options: ['Pauses execution until the promise settles', 'Stops the whole program', 'Converts a promise to a callback', 'Runs code on a separate thread'], correctIndex: 0 },
+      { id: 'ji5', topic: 'Arrays', text: 'Which method removes the last element of an array?', options: ['pop', 'shift', 'slice', 'splice(0)'], correctIndex: 0 },
     ],
-    status: 'passed', strongAreas: ['Arrays', 'Objects'], needsImprovement: ['Closures', 'Async JavaScript'],
   },
   {
     id: 'assess-js-advanced', title: 'JavaScript Advanced', moduleId: 'js-advanced', topics: ['Closures', 'Event Loop', 'Promises'],
-    totalQuestions: 30, timeLimitMinutes: 45, passingScorePercent: 60, attemptsAllowed: 2,
-    attempts: [{ attemptNo: 1, scorePercent: 62, date: '2026-06-28' }], status: 'failed',
-    strongAreas: ['Promises'], needsImprovement: ['Event Loop'],
+    timeLimitMinutes: 20, passingScorePercent: 60, attemptsAllowed: 2,
+    questions: [
+      { id: 'ja1', topic: 'Event Loop', text: 'Which queue do resolved Promise callbacks go into?', options: ['Microtask queue', 'Macrotask queue', 'Render queue', 'Call stack'], correctIndex: 0 },
+      { id: 'ja2', topic: 'Promises', text: 'Promise.all rejects as soon as...', options: ['any one promise rejects', 'all promises reject', 'the first promise resolves', 'never'], correctIndex: 0 },
+      { id: 'ja3', topic: 'Closures', text: 'Closures are commonly used to...', options: ['create private state', 'block the event loop', 'clear timers', 'define CSS variables'], correctIndex: 0 },
+      { id: 'ja4', topic: 'Event Loop', text: 'Given sync code, a microtask, and a macrotask (setTimeout) scheduled together, which runs first?', options: ['The synchronous code', 'The microtask', 'The macrotask', 'Order is random'], correctIndex: 0 },
+      { id: 'ja5', topic: 'Promises', text: 'What does `Promise.race` do?', options: ['Settles as soon as the first promise settles', 'Waits for all promises', 'Retries failed promises', 'Cancels other promises'], correctIndex: 0 },
+    ],
   },
   {
     id: 'assess-react', title: 'React Fundamentals', moduleId: 'react', topics: ['Components', 'Props', 'State'],
-    totalQuestions: 25, timeLimitMinutes: 40, passingScorePercent: 60, attemptsAllowed: 2,
-    attempts: [{ attemptNo: 1, scorePercent: 85, date: '2026-07-12' }], status: 'passed',
-    strongAreas: ['Components', 'Props'], needsImprovement: [],
+    timeLimitMinutes: 20, passingScorePercent: 60, attemptsAllowed: 2,
+    questions: [
+      { id: 'r1', topic: 'Components', text: 'What must a React component return?', options: ['JSX (or null)', 'A string only', 'A Promise', 'An HTML file'], correctIndex: 0 },
+      { id: 'r2', topic: 'Props', text: 'Props are...', options: ['Read-only inputs passed from a parent', 'Mutable internal data', 'Global variables', 'CSS classes'], correctIndex: 0 },
+      { id: 'r3', topic: 'State', text: 'Calling a state setter causes...', options: ['A re-render', 'An immediate synchronous mutation', 'A page reload', 'Nothing until refresh'], correctIndex: 0 },
+      { id: 'r4', topic: 'Components', text: 'A component name must start with...', options: ['An uppercase letter', 'A lowercase letter', 'A number', 'An underscore'], correctIndex: 0 },
+      { id: 'r5', topic: 'Props', text: 'How do you pass a value to a child component?', options: ['As a prop attribute in JSX', 'Via a global variable', 'Via localStorage', 'Via a CSS class'], correctIndex: 0 },
+    ],
   },
   {
     id: 'assess-react-hooks', title: 'React Hooks', moduleId: 'react-hooks', topics: ['useState', 'useEffect', 'Custom Hooks'],
-    totalQuestions: 25, timeLimitMinutes: 40, passingScorePercent: 60, attemptsAllowed: 2,
-    attempts: [], status: 'not-started', strongAreas: [], needsImprovement: [],
+    timeLimitMinutes: 20, passingScorePercent: 60, attemptsAllowed: 2,
+    questions: [
+      { id: 'rh1', topic: 'useState', text: 'The useState initializer function/value is used...', options: ['Only on the first render', 'On every render', 'Never', 'Only when props change'], correctIndex: 0 },
+      { id: 'rh2', topic: 'useEffect', text: 'An empty dependency array `[]` means the effect runs...', options: ['Once, after the first render', 'On every render', 'Never', 'Before render'], correctIndex: 0 },
+      { id: 'rh3', topic: 'Custom Hooks', text: "A custom hook's name must start with...", options: ['use', 'get', 'on', 'with'], correctIndex: 0 },
+      { id: 'rh4', topic: 'useEffect', text: 'The cleanup function returned from useEffect runs...', options: ['Before the effect re-runs and on unmount', 'Only on unmount', 'Only on mount', 'Never'], correctIndex: 0 },
+      { id: 'rh5', topic: 'useState', text: 'What triggers a re-render when using useState?', options: ['Calling the setter with a new value', 'Reading the state value', 'Declaring the state', 'Passing props'], correctIndex: 0 },
+    ],
   },
   {
     id: 'assess-node', title: 'Node.js Fundamentals', moduleId: 'node', topics: ['Modules', 'File System', 'npm'],
-    totalQuestions: 20, timeLimitMinutes: 30, passingScorePercent: 60, attemptsAllowed: 2,
-    attempts: [], status: 'not-started', strongAreas: [], needsImprovement: [],
+    timeLimitMinutes: 15, passingScorePercent: 60, attemptsAllowed: 2,
+    questions: [
+      { id: 'n1', topic: 'Modules', text: 'Which keyword imports a module in CommonJS?', options: ['require', 'import', 'include', 'using'], correctIndex: 0 },
+      { id: 'n2', topic: 'File System', text: 'Which fs method reads a file without blocking the event loop?', options: ['fs.readFile', 'fs.readFileSync', 'fs.open', 'fs.stat'], correctIndex: 0 },
+      { id: 'n3', topic: 'npm', text: "Where are a project's dependencies declared?", options: ['package.json', 'node_modules', '.npmrc', 'index.js'], correctIndex: 0 },
+      { id: 'n4', topic: 'Modules', text: 'What does `module.exports` do?', options: ['Defines what a file exposes to other files', 'Starts the server', 'Installs a package', 'Reads environment variables'], correctIndex: 0 },
+      { id: 'n5', topic: 'File System', text: 'Which method appends data to an existing file?', options: ['fs.appendFile', 'fs.writeFile', 'fs.createFile', 'fs.readFile'], correctIndex: 0 },
+    ],
   },
 ];
 
 // ---- Major Project ----
 
-export const majorProject: MajorProject = {
+export const majorProject: MajorProjectDef = {
+  moduleId: 'major-project',
   title: 'Full Stack E-Commerce Application',
-  subtitle: 'Course Capstone',
-  progressPercent: 40,
-  milestones: [
-    { title: 'Requirements', status: 'completed' },
-    { title: 'UI Design', status: 'completed' },
-    { title: 'Database', status: 'completed' },
-    { title: 'Backend', status: 'completed' },
-    { title: 'Frontend', status: 'current' },
-    { title: 'Authentication', status: 'upcoming' },
-    { title: 'Deployment', status: 'upcoming' },
-    { title: 'Final Review', status: 'upcoming' },
-  ],
-  currentMilestone: 'Frontend',
+  description: 'A complete MERN application with product catalog, cart, checkout, auth and an admin panel.',
   deadlineInDays: 10,
-  evaluationCriteria: [
-    { label: 'Functionality', score: 0, maxScore: 25 },
-    { label: 'Code Quality', score: 0, maxScore: 15 },
-    { label: 'UI / UX', score: 0, maxScore: 15 },
-    { label: 'Architecture', score: 0, maxScore: 15 },
-    { label: 'Database', score: 0, maxScore: 10 },
-    { label: 'Deployment', score: 0, maxScore: 10 },
-    { label: 'Documentation', score: 0, maxScore: 10 },
+  milestones: [
+    { id: 'm1', title: 'Requirements', objectives: ['Define user stories', 'Define data model'], deliverables: ['Requirements doc'] },
+    { id: 'm2', title: 'UI Design', objectives: ['Wireframe key screens', 'Pick a component library or design system'], deliverables: ['Wireframes / mockups'] },
+    { id: 'm3', title: 'Database', objectives: ['Design MongoDB schemas for products, users, orders'], deliverables: ['Schema diagram', 'Seed data'] },
+    { id: 'm4', title: 'Backend', objectives: ['Build REST API for catalog, cart, orders', 'Add authentication'], deliverables: ['API repository', 'API documentation'] },
+    { id: 'm5', title: 'Frontend', objectives: ['Build catalog, cart and checkout UI', 'Connect to the live API'], deliverables: ['Frontend repository'] },
+    { id: 'm6', title: 'Authentication', objectives: ['Login/signup flow', 'Protected routes for checkout and admin'], deliverables: ['Auth flow demo'] },
+    { id: 'm7', title: 'Deployment', objectives: ['Deploy frontend and backend', 'Configure environment variables'], deliverables: ['Live URL'] },
+    { id: 'm8', title: 'Final Review', objectives: ['End-to-end walkthrough', 'Fix review feedback'], deliverables: ['Final submission'] },
+  ],
+  evaluationCriteriaTemplate: [
+    { label: 'Functionality', maxScore: 25 },
+    { label: 'Code Quality', maxScore: 15 },
+    { label: 'UI / UX', maxScore: 15 },
+    { label: 'Architecture', maxScore: 15 },
+    { label: 'Database', maxScore: 10 },
+    { label: 'Deployment', maxScore: 10 },
+    { label: 'Documentation', maxScore: 10 },
   ],
 };
-
-// ---- Recent feedback (surfaced on Home) ----
-
-export const recentFeedback: RecentFeedback[] = [
-  {
-    id: 'fb1', sourceType: 'miniTask', sourceId: 'task-react-todo', title: 'React Todo Application',
-    status: 'Changes Requested', comment: 'Move filtering logic into a reusable hook.',
-  },
-];

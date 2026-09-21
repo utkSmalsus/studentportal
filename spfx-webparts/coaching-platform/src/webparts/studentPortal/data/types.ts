@@ -1,162 +1,123 @@
-// Domain types for the student learning experience. Shaped so a real API/SharePoint
-// data source can replace `mockData.ts` later without any UI code changing — every
-// page reads these types only, never a hardcoded shape.
-
-export type ModuleStatus = 'completed' | 'current' | 'upcoming' | 'locked' | 'failed';
+// Content definitions only — what a course IS, never what a particular student has
+// done with it. Progress/attempt state lives in state/types.ts and is combined with
+// these definitions by the engine. This split is what lets a real backend replace
+// mockData.ts later without touching the engine or any page.
 
 export type ModuleGroup = 'Foundation' | 'Programming' | 'Frontend' | 'Backend' | 'Full Stack' | 'Capstone';
+export type Difficulty = 'Beginner' | 'Intermediate' | 'Advanced';
 
-export interface LearningStep {
+export interface LessonDef {
   id: string;
   title: string;
-  status: 'completed' | 'current' | 'upcoming';
+  estimatedMinutes: number;
 }
 
-export interface CourseModule {
+export interface PracticeDef {
+  id: string;
+  title: string;
+  description: string;
+  estimatedMinutes: number;
+}
+
+export interface ModuleDef {
   id: string;
   title: string;
   group: ModuleGroup;
-  status: ModuleStatus;
-  progressPercent: number;
+  estimatedDuration: string;
   whatYoullLearn: string[];
-  learn: LearningStep[];
-  practice: LearningStep[];
+  learn: LessonDef[];
+  practice: PracticeDef[];
   miniTaskId?: string;
   assessmentId?: string;
+  // A module with no prerequisite is unlocked from day one. Everything else stays
+  // locked until the engine confirms the prerequisite module is complete.
   prerequisiteModuleId?: string;
 }
 
 export interface Course {
   id: string;
   title: string;
-  currentWeek: number;
-  currentModuleId: string;
+  // Canonical module sequence for this course — the engine walks this order to find
+  // "the" module a student should be working on. Same shape works for SPFx: a course
+  // is just an id, a title and an ordered list of module ids.
+  moduleOrder: string[];
 }
 
 // ---- Daily Coding (independent of the course journey) ----
 
-export type CodingQuestionStatus = 'solved' | 'failed' | 'pending' | 'today';
-export type CodingDifficulty = 'Beginner' | 'Intermediate' | 'Advanced';
-
-export interface CodingQuestion {
+export interface CodingQuestionDef {
   id: string;
   day: number;
   title: string;
-  difficulty: CodingDifficulty;
+  difficulty: Difficulty;
   topic: string;
   tags: string[];
-  status: CodingQuestionStatus;
   problemStatement: string;
   exampleInput: string;
   exampleOutput: string;
   constraints: string[];
+  hints: string[];
   testCasesTotal: number;
-  testCasesPassed?: number;
-  scorePercent?: number;
-  timeComplexity?: string;
-  feedback?: string;
-}
-
-export interface WeekDayStatus {
-  day: string;
-  status: 'solved' | 'missed' | 'today' | 'upcoming';
+  // Substrings the mock evaluator looks for to decide how "complete" a solution
+  // looks. A real execution service would replace evaluateCodingSubmission()
+  // entirely; this is what makes the mock evaluator swappable rather than a
+  // hardcoded pass/fail.
+  keywordChecks: string[];
 }
 
 // ---- Mini Tasks ----
 
-export type MiniTaskStatus =
-  | 'Not Started'
-  | 'In Progress'
-  | 'Submitted'
-  | 'Under Review'
-  | 'Changes Requested'
-  | 'Resubmitted'
-  | 'Passed';
-
-export interface EvaluationCriterion {
-  label: string;
-  score: number;
-  maxScore: number;
-}
-
-export interface Evaluation {
-  criteria: EvaluationCriterion[];
-  feedback: string;
-  status: 'Changes Requested' | 'Approved';
-  evaluatedAt: string;
-}
-
-export interface MiniTask {
+export interface MiniTaskDef {
   id: string;
   title: string;
   moduleId: string;
-  difficulty: CodingDifficulty;
+  difficulty: Difficulty;
   estimatedDuration: string;
   deadline: string;
   objective: string;
-  requirements: { label: string; done: boolean }[];
+  requirements: string[];
   skills: string[];
-  status: MiniTaskStatus;
-  submission?: { githubUrl: string; liveUrl: string; notes: string };
-  evaluation?: Evaluation;
+  resources: string[];
+  evaluationCriteriaTemplate: { label: string; maxScore: number }[];
 }
 
 // ---- Assessments ----
 
-export interface AssessmentAttempt {
-  attemptNo: number;
-  scorePercent: number;
-  date: string;
+export interface AssessmentQuestionDef {
+  id: string;
+  topic: string;
+  text: string;
+  options: string[];
+  correctIndex: number;
 }
 
-export interface Assessment {
+export interface AssessmentDef {
   id: string;
   title: string;
   moduleId: string;
   topics: string[];
-  totalQuestions: number;
   timeLimitMinutes: number;
   passingScorePercent: number;
   attemptsAllowed: number;
-  attempts: AssessmentAttempt[];
-  status: 'not-started' | 'in-progress' | 'passed' | 'failed';
-  strongAreas: string[];
-  needsImprovement: string[];
+  questions: AssessmentQuestionDef[];
 }
 
 // ---- Major Project ----
 
-export interface Milestone {
-  title: string;
-  status: 'completed' | 'current' | 'upcoming';
-}
-
-export interface MajorProject {
-  title: string;
-  subtitle: string;
-  progressPercent: number;
-  milestones: Milestone[];
-  currentMilestone: string;
-  deadlineInDays: number;
-  evaluationCriteria: EvaluationCriterion[];
-}
-
-// ---- Feedback & Performance ----
-
-export interface RecentFeedback {
+export interface MilestoneDef {
   id: string;
-  sourceType: 'miniTask' | 'assessment' | 'project';
-  sourceId: string;
   title: string;
-  status: string;
-  comment: string;
+  objectives: string[];
+  deliverables: string[];
 }
 
-export type SkillLevel = 'Strong' | 'Developing' | 'Not Started';
-
-export interface SkillRating {
-  label: string;
-  level: SkillLevel;
+export interface MajorProjectDef {
+  moduleId: string;
+  title: string;
+  description: string;
+  deadlineInDays: number;
+  milestones: MilestoneDef[];
+  evaluationCriteriaTemplate: { label: string; maxScore: number }[];
 }
 
 export interface StudentProfile {

@@ -1,81 +1,116 @@
-// Every derived number the UI shows is computed here, once, from the raw records —
-// so "8/10 tasks complete" and "82% success rate" can never drift out of sync with
-// the actual mini task / coding question records they summarize.
-import { modules, miniTasks, assessments, codingQuestions, majorProject } from './mockData';
-import { Assessment, CodingQuestion, CourseModule, MiniTask, SkillRating } from './types';
+// Derived values combining content definitions (this file's imports) with live
+// progress state (passed in by callers via useAppState()). Every number the UI
+// shows is computed here once — nothing is hand-typed twice, so it can't drift.
+import { moduleDefs, course, miniTasks, assessments, codingQuestions, majorProject } from './mockData';
+import { ModuleDef, MiniTaskDef, AssessmentDef, CodingQuestionDef } from './types';
+import { StudentProgressState } from '../state/types';
+import * as progression from '../state/engine/progression';
 
-export function getModuleById(id: string): CourseModule | undefined {
-  return modules.find((m) => m.id === id);
+export { moduleDefs, course, miniTasks, assessments, codingQuestions, majorProject };
+
+export type SkillLevel = 'Strong' | 'Developing' | 'Not Started';
+export interface SkillRating {
+  label: string;
+  level: SkillLevel;
 }
 
-export function getMiniTaskById(id: string): MiniTask | undefined {
+export function getModuleById(id: string): ModuleDef | undefined {
+  return moduleDefs.find((m) => m.id === id);
+}
+
+export function getMiniTaskById(id: string): MiniTaskDef | undefined {
   return miniTasks.find((t) => t.id === id);
 }
 
-export function getAssessmentById(id: string): Assessment | undefined {
+export function getAssessmentById(id: string): AssessmentDef | undefined {
   return assessments.find((a) => a.id === id);
 }
 
-export function getCodingQuestionById(id: string): CodingQuestion | undefined {
+export function getCodingQuestionById(id: string): CodingQuestionDef | undefined {
   return codingQuestions.find((q) => q.id === id);
 }
 
-export function courseOverallProgress(): number {
-  const total = modules.length;
-  const sum = modules.reduce((s, m) => s + m.progressPercent, 0);
-  return Math.round(sum / total);
+export function courseOverallProgress(progress: StudentProgressState): number {
+  return progression.courseOverallProgress(course, moduleDefs, progress);
 }
 
-export function miniTaskStats(): { total: number; completed: number; underReview: number; changesRequested: number } {
-  const completed = miniTasks.filter((t) => t.status === 'Passed').length;
-  const underReview = miniTasks.filter((t) => t.status === 'Under Review' || t.status === 'Submitted' || t.status === 'Resubmitted').length;
-  const changesRequested = miniTasks.filter((t) => t.status === 'Changes Requested').length;
-  return { total: miniTasks.length, completed, underReview, changesRequested };
+export function miniTaskStats(progress: StudentProgressState): { total: number; completed: number; underReview: number; changesRequested: number } {
+  const entries = miniTasks.map((t) => progress.miniTasks[t.id]?.status || 'Not Started');
+  return {
+    total: miniTasks.length,
+    completed: entries.filter((s) => s === 'Passed').length,
+    underReview: entries.filter((s) => s === 'Under Review' || s === 'Submitted' || s === 'Resubmitted').length,
+    changesRequested: entries.filter((s) => s === 'Changes Requested').length,
+  };
 }
 
-export function assessmentStats(): { total: number; completed: number; averagePercent: number } {
-  const attempted = assessments.filter((a) => a.attempts.length > 0);
+export function assessmentStats(progress: StudentProgressState): { total: number; completed: number; averagePercent: number } {
+  const attempted = assessments.filter((a) => (progress.assessments[a.id]?.attempts.length || 0) > 0);
   const avg = attempted.length
-    ? Math.round(attempted.reduce((s, a) => s + a.attempts[a.attempts.length - 1].scorePercent, 0) / attempted.length)
+    ? Math.round(
+        attempted.reduce((sum, a) => {
+          const entry = progress.assessments[a.id];
+          const latest = entry.attempts[entry.attempts.length - 1];
+          return sum + latest.scorePercent;
+        }, 0) / attempted.length
+      )
     : 0;
   return { total: assessments.length, completed: attempted.length, averagePercent: avg };
 }
 
-export function codingStats(): { attempted: number; solved: number; successRate: number } {
-  const attempted = codingQuestions.filter((q) => q.status === 'solved' || q.status === 'failed');
-  const solved = codingQuestions.filter((q) => q.status === 'solved').length;
-  const successRate = attempted.length ? Math.round((solved / attempted.length) * 100) : 0;
-  return { attempted: attempted.length, solved, successRate };
+export function codingStats(progress: StudentProgressState): { attempted: number; solved: number; successRate: number } {
+  const attemptedQuestions = codingQuestions.filter((q) => (progress.coding[q.id]?.attempts.length || 0) > 0);
+  const solved = codingQuestions.filter((q) => progress.coding[q.id]?.attempts.some((a) => a.passed)).length;
+  const successRate = attemptedQuestions.length ? Math.round((solved / attemptedQuestions.length) * 100) : 0;
+  return { attempted: attemptedQuestions.length, solved, successRate };
 }
 
-export function skillRatings(): SkillRating[] {
-  const level = (moduleId: string): 'Strong' | 'Developing' | 'Not Started' => {
-    const m = getModuleById(moduleId);
-    if (!m) return 'Not Started';
-    if (m.status === 'completed') return 'Strong';
-    if (m.status === 'current') return 'Developing';
-    return 'Not Started';
-  };
-  return [
-    { label: 'HTML', level: level('html') },
-    { label: 'CSS', level: level('css') },
-    { label: 'JavaScript', level: level('js-advanced') },
-    { label: 'React', level: level('react-hooks') },
-    { label: 'Node.js', level: level('node') },
-  ];
+const SKILL_MODULE_IDS: { label: string; moduleId: string }[] = [
+  { label: 'HTML', moduleId: 'html' },
+  { label: 'CSS', moduleId: 'css' },
+  { label: 'JavaScript', moduleId: 'js-advanced' },
+  { label: 'React', moduleId: 'react-hooks' },
+  { label: 'Node.js', moduleId: 'node' },
+  { label: 'MongoDB', moduleId: 'mongodb' },
+];
+
+export interface RecommendedFocus {
+  topic: string;
+  assessmentTitle: string;
+  suggestedQuestions: CodingQuestionDef[];
 }
 
-export function currentModule(): CourseModule {
-  const current = modules.find((m) => m.status === 'current');
-  return current || modules[0];
+// Generic across any course: looks at the most recent assessment attempt that has
+// a weak topic, and cross-references the (also generic) daily coding bank for
+// questions tagged with that topic. No assessment- or course-specific logic here.
+export function recommendedFocus(progress: StudentProgressState): RecommendedFocus | undefined {
+  let latest: { date: string; weakTopics: string[]; assessmentTitle: string } | undefined;
+  assessments.forEach((a) => {
+    const entry = progress.assessments[a.id];
+    if (!entry || entry.attempts.length === 0) return;
+    const last = entry.attempts[entry.attempts.length - 1];
+    if (last.weakTopics.length === 0) return;
+    if (!latest || new Date(last.date).getTime() > new Date(latest.date).getTime()) {
+      latest = { date: last.date, weakTopics: last.weakTopics, assessmentTitle: a.title };
+    }
+  });
+  if (!latest) return undefined;
+
+  const topic = latest.weakTopics[0];
+  const topicLower = topic.toLowerCase();
+  const suggestedQuestions = codingQuestions
+    .filter((q) => q.topic.toLowerCase().includes(topicLower) || q.tags.some((t) => topicLower.includes(t.toLowerCase()) || t.toLowerCase().includes(topicLower)))
+    .slice(0, 3);
+
+  return { topic, assessmentTitle: latest.assessmentTitle, suggestedQuestions };
 }
 
-export function nextIncompleteStep(m: CourseModule): { kind: 'learn' | 'practice'; title: string } | undefined {
-  const learnStep = m.learn.find((s) => s.status !== 'completed');
-  if (learnStep) return { kind: 'learn', title: learnStep.title };
-  const practiceStep = m.practice.find((s) => s.status !== 'completed');
-  if (practiceStep) return { kind: 'practice', title: practiceStep.title };
-  return undefined;
+export function skillRatings(progress: StudentProgressState): SkillRating[] {
+  return SKILL_MODULE_IDS.map(({ label, moduleId }) => {
+    const module = getModuleById(moduleId);
+    if (!module) return { label, level: 'Not Started' };
+    const status = progression.getModuleStatus(module, moduleDefs, progress);
+    const level: SkillLevel = status === 'completed' ? 'Strong' : status === 'current' ? 'Developing' : 'Not Started';
+    return { label, level };
+  });
 }
-
-export { modules, miniTasks, assessments, codingQuestions, majorProject };

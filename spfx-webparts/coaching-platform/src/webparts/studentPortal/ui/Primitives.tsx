@@ -67,24 +67,70 @@ export const EmptyState: React.FC<{ title: string; description?: string }> = ({ 
   </div>
 );
 
-// A single checklist row inside a Learn/Practice/Requirements list.
-export const StepRow: React.FC<{ title: string; status: 'completed' | 'current' | 'upcoming'; onClick?: () => void }> = ({
-  title,
-  status,
-  onClick,
-}) => {
+// A single checklist row inside a Learn/Practice list. When the row is the one
+// currently in progress, it can carry a "Mark Complete" action — that's the actual
+// state-changing control, distinct from the row itself being clickable.
+export const StepRow: React.FC<{
+  title: string;
+  meta?: string;
+  status: 'completed' | 'current' | 'upcoming';
+  onComplete?: () => void;
+}> = ({ title, meta, status, onComplete }) => {
   const icon = status === 'completed' ? '✓' : status === 'current' ? '●' : '○';
   const color: SemanticColor = status === 'completed' ? 'green' : status === 'current' ? 'blue' : 'gray';
   const c = colorClasses[color];
   return (
-    <button
-      onClick={onClick}
-      disabled={!onClick}
-      className={`w-full flex items-center gap-3 py-2 text-left text-sm ${onClick ? 'hover:bg-gray-50 rounded-md px-2 -mx-2' : ''}`}
-    >
+    <div className="flex items-center gap-3 py-2">
       <span className={`w-4 text-center font-medium ${c.text}`}>{icon}</span>
-      <span className={status === 'upcoming' ? 'text-gray-400' : 'text-gray-800'}>{title}</span>
-    </button>
+      <div className="flex-1">
+        <div className={status === 'upcoming' ? 'text-gray-400 text-sm' : 'text-gray-800 text-sm'}>{title}</div>
+        {meta && <div className="text-xs text-gray-400">{meta}</div>}
+      </div>
+      {status === 'current' && onComplete && (
+        <SecondaryButton onClick={onComplete} className="text-xs px-3 py-1.5">
+          Mark Complete
+        </SecondaryButton>
+      )}
+    </div>
+  );
+};
+
+export const LoadingState: React.FC<{ label?: string }> = ({ label = 'Loading…' }) => (
+  <div className="flex items-center gap-2 text-sm text-gray-400 py-8 justify-center">
+    <span className="w-3 h-3 rounded-full border-2 border-gray-300 border-t-gray-500 animate-spin" />
+    {label}
+  </div>
+);
+
+export interface RubricCriterion {
+  label: string;
+  score: number;
+  maxScore: number;
+}
+
+export const EvaluationRubric: React.FC<{ criteria: RubricCriterion[]; barColor?: SemanticColor }> = ({ criteria, barColor = 'blue' }) => {
+  const totalScore = criteria.reduce((s, c) => s + c.score, 0);
+  const totalMax = criteria.reduce((s, c) => s + c.maxScore, 0);
+  return (
+    <div className="space-y-2.5">
+      {criteria.map((c) => (
+        <div key={c.label}>
+          <div className="flex justify-between text-sm mb-1">
+            <span className="text-gray-700">{c.label}</span>
+            <span className="text-gray-500">
+              {c.score} / {c.maxScore}
+            </span>
+          </div>
+          <ProgressBar percent={(c.score / c.maxScore) * 100} color={barColor} />
+        </div>
+      ))}
+      <div className="flex justify-between text-sm font-semibold pt-2 border-t border-gray-100">
+        <span>Total</span>
+        <span>
+          {totalScore} / {totalMax}
+        </span>
+      </div>
+    </div>
   );
 };
 

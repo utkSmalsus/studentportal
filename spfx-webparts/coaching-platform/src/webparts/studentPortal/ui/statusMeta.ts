@@ -37,7 +37,8 @@ export const assessmentStatusMeta: Record<string, { label: string; color: Semant
 
 export const codingStatusMeta: Record<string, { label: string; color: SemanticColor }> = {
   solved: { label: 'Solved', color: 'green' },
-  failed: { label: 'Failed', color: 'red' },
+  failed: { label: 'Attempted', color: 'amber' },
+  missed: { label: 'Missed', color: 'gray' },
   pending: { label: 'Upcoming', color: 'gray' },
   today: { label: "Today's Challenge", color: 'blue' },
 };
