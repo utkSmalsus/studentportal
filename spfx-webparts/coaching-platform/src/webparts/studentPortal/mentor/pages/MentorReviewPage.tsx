@@ -25,7 +25,10 @@ interface QueueRow {
   attempt: number;
   githubUrl?: string;
   githubBranch?: string;
+  commitSha?: string;
+  pullRequestUrl?: string;
   liveUrl?: string;
+  documentationUrl?: string;
   notes?: string;
   taskId?: string;
 }
@@ -54,6 +57,8 @@ const MentorReviewPage: React.FC<{ mentorId: string }> = ({ mentorId }) => {
       attempt: sub.attempt,
       githubUrl: sub.repositoryName ? `https://github.com/${sub.repositoryName}` : undefined,
       githubBranch: sub.branch,
+      commitSha: sub.commitSha,
+      pullRequestUrl: sub.pullRequestUrl,
       liveUrl: sub.liveUrl,
       notes: sub.notes,
       taskId: sub.taskId,
@@ -79,7 +84,10 @@ const MentorReviewPage: React.FC<{ mentorId: string }> = ({ mentorId }) => {
         attempt: submission.attempt,
         githubUrl: submission.repositoryName ? `https://github.com/${submission.repositoryName}` : undefined,
         githubBranch: submission.branch,
+        commitSha: submission.commitSha,
+        pullRequestUrl: submission.pullRequestUrl,
         liveUrl: submission.liveUrl,
+        documentationUrl: submission.documentationUrl,
       },
     ]);
   }, []);
@@ -102,6 +110,12 @@ const MentorReviewPage: React.FC<{ mentorId: string }> = ({ mentorId }) => {
     : open?.kind === 'project'
     ? courseRepo.getCourseContent(open.courseId)?.majorProject.evaluationCriteriaTemplate
     : undefined;
+  // The attempt right before the one being reviewed — evaluating the open
+  // attempt only ever writes to that attempt's own version, never this one.
+  const previousAttempt =
+    open?.kind === 'project' && open.attempt > 1
+      ? projectSubmissionRepo.listProjectSubmissions(open.studentId, open.courseId).find((s) => s.attempt === open.attempt - 1)
+      : undefined;
 
   const openRow = (row: QueueRow): void => {
     setOpen(row);
@@ -159,11 +173,33 @@ const MentorReviewPage: React.FC<{ mentorId: string }> = ({ mentorId }) => {
                     {open.githubBranch}
                   </div>
                 )}
+                {open.commitSha && (
+                  <div>
+                    <span className="text-slate-400">Commit: </span>
+                    <span className="font-mono text-xs">{open.commitSha}</span>
+                  </div>
+                )}
+                {open.pullRequestUrl && (
+                  <div>
+                    <span className="text-slate-400">Pull Request: </span>
+                    <a href={open.pullRequestUrl} target="_blank" rel="noreferrer" className="text-indigo-600 font-medium hover:underline">
+                      {open.pullRequestUrl}
+                    </a>
+                  </div>
+                )}
                 {open.liveUrl && (
                   <div>
                     <span className="text-slate-400">Live: </span>
                     <a href={open.liveUrl} target="_blank" rel="noreferrer" className="text-indigo-600 font-medium hover:underline">
                       {open.liveUrl}
+                    </a>
+                  </div>
+                )}
+                {open.documentationUrl && (
+                  <div>
+                    <span className="text-slate-400">Documentation: </span>
+                    <a href={open.documentationUrl} target="_blank" rel="noreferrer" className="text-indigo-600 font-medium hover:underline">
+                      {open.documentationUrl}
                     </a>
                   </div>
                 )}
@@ -178,6 +214,14 @@ const MentorReviewPage: React.FC<{ mentorId: string }> = ({ mentorId }) => {
                 Open the repository to review the actual code before scoring — a commit existing is evidence of activity, not completion.
               </p>
             </Card>
+
+            {previousAttempt?.evaluation && (
+              <Card>
+                <SectionTitle>Previous Attempt (#{previousAttempt.attempt})</SectionTitle>
+                <p className="text-sm text-amber-700 mb-2">{previousAttempt.evaluation.outcome === 'Changes Requested' ? 'Changes were requested:' : 'Previously passed, but a new attempt was submitted:'}</p>
+                <p className="text-sm text-slate-700">{previousAttempt.evaluation.feedback}</p>
+              </Card>
+            )}
 
             {openEvaluationCriteria && (
               <Card>

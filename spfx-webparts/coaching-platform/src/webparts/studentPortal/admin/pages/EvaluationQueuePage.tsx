@@ -24,7 +24,11 @@ interface QueueRow {
   status: EvaluationStatus;
   attempt: number;
   githubUrl?: string;
+  branch?: string;
+  commitSha?: string;
+  pullRequestUrl?: string;
   liveUrl?: string;
+  documentationUrl?: string;
   notes?: string;
   taskId?: string;
 }
@@ -55,6 +59,9 @@ const EvaluationQueuePage: React.FC = () => {
       status: sub.status as EvaluationStatus,
       attempt: sub.attempt,
       githubUrl: sub.repositoryName ? `https://github.com/${sub.repositoryName}` : undefined,
+      branch: sub.branch,
+      commitSha: sub.commitSha,
+      pullRequestUrl: sub.pullRequestUrl,
       liveUrl: sub.liveUrl,
       notes: sub.notes,
       taskId: sub.taskId,
@@ -79,7 +86,11 @@ const EvaluationQueuePage: React.FC = () => {
         status: submission.status as EvaluationStatus,
         attempt: submission.attempt,
         githubUrl: submission.repositoryName ? `https://github.com/${submission.repositoryName}` : undefined,
+        branch: submission.branch,
+        commitSha: submission.commitSha,
+        pullRequestUrl: submission.pullRequestUrl,
         liveUrl: submission.liveUrl,
+        documentationUrl: submission.documentationUrl,
       },
     ]);
   }, []);
@@ -103,6 +114,14 @@ const EvaluationQueuePage: React.FC = () => {
   };
 
   const openTaskDef = open?.kind === 'miniTask' && open.taskId ? courseRepo.getCourseContent(open.courseId)?.miniTasks.find((t) => t.id === open.taskId) : undefined;
+  // The attempt right before the one being reviewed, if any — so a mentor
+  // resolving a resubmission can see what was asked for last time. Evaluating
+  // the open attempt only ever writes to that attempt's own version (see
+  // evaluateProjectSubmission/evaluateSubmission), never to this one.
+  const previousAttempt =
+    open?.kind === 'project' && open.attempt > 1
+      ? projectSubmissionRepo.listProjectSubmissions(open.studentId, open.courseId).find((s) => s.attempt === open.attempt - 1)
+      : undefined;
   const openEvaluationCriteria = openTaskDef
     ? openTaskDef.evaluationCriteriaTemplate
     : open?.kind === 'project'
@@ -147,9 +166,29 @@ const EvaluationQueuePage: React.FC = () => {
               <div className="text-sm space-y-1.5">
                 {open.githubUrl && (
                   <div>
-                    <span className="text-slate-400">GitHub: </span>
+                    <span className="text-slate-400">Repository: </span>
                     <a href={open.githubUrl} className="text-indigo-600 font-medium hover:underline">
                       {open.githubUrl}
+                    </a>
+                  </div>
+                )}
+                {open.branch && (
+                  <div>
+                    <span className="text-slate-400">Branch: </span>
+                    {open.branch}
+                  </div>
+                )}
+                {open.commitSha && (
+                  <div>
+                    <span className="text-slate-400">Commit: </span>
+                    <span className="font-mono text-xs">{open.commitSha}</span>
+                  </div>
+                )}
+                {open.pullRequestUrl && (
+                  <div>
+                    <span className="text-slate-400">Pull Request: </span>
+                    <a href={open.pullRequestUrl} className="text-indigo-600 font-medium hover:underline">
+                      {open.pullRequestUrl}
                     </a>
                   </div>
                 )}
@@ -161,6 +200,14 @@ const EvaluationQueuePage: React.FC = () => {
                     </a>
                   </div>
                 )}
+                {open.documentationUrl && (
+                  <div>
+                    <span className="text-slate-400">Documentation: </span>
+                    <a href={open.documentationUrl} className="text-indigo-600 font-medium hover:underline">
+                      {open.documentationUrl}
+                    </a>
+                  </div>
+                )}
                 {open.notes && (
                   <div>
                     <span className="text-slate-400">Notes: </span>
@@ -169,6 +216,14 @@ const EvaluationQueuePage: React.FC = () => {
                 )}
               </div>
             </Card>
+
+            {previousAttempt?.evaluation && (
+              <Card>
+                <SectionTitle>Previous Attempt (#{previousAttempt.attempt})</SectionTitle>
+                <p className="text-sm text-amber-700 mb-2">{previousAttempt.evaluation.outcome === 'Changes Requested' ? 'Changes were requested:' : 'Previously passed, but a new attempt was submitted:'}</p>
+                <p className="text-sm text-slate-700">{previousAttempt.evaluation.feedback}</p>
+              </Card>
+            )}
 
             {openEvaluationCriteria && (
               <Card>

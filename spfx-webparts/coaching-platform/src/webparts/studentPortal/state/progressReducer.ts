@@ -34,7 +34,7 @@ export type ProgressAction =
   | { type: 'ADMIN_EVALUATE_MINI_TASK'; taskId: string; version: number; evaluation: MiniTaskEvaluation }
   | { type: 'RECORD_ASSESSMENT_ATTEMPT'; assessmentId: string; answers: Record<string, number> }
   | { type: 'ADVANCE_MILESTONE'; milestoneId: string; nextMilestoneId?: string }
-  | { type: 'SUBMIT_PROJECT'; githubUrl: string; liveUrl: string; documentationUrl: string }
+  | { type: 'SUBMIT_PROJECT'; githubUrl: string; liveUrl: string; documentationUrl: string; github?: { repositoryName?: string; branch?: string; commitSha?: string; pullRequestUrl?: string } }
   | { type: 'ADMIN_EVALUATE_PROJECT'; version: number; evaluation: ProjectEvaluation };
 
 export function pushNotification(list: NotificationItem[], message: string, kind: NotificationItem['kind']): NotificationItem[] {
@@ -183,9 +183,16 @@ export function progressReducer(state: StudentProgressState, action: ProgressAct
     }
 
     case 'SUBMIT_PROJECT': {
+      // A structured repositoryName is the source of truth for githubUrl when
+      // present — never store a manually-typed URL alongside a contradictory
+      // structured repo (mirrors SUBMIT_MINI_TASK's same rule).
       const version: ProjectSubmissionVersion = {
         version: state.project.versions.length + 1,
-        githubUrl: action.githubUrl,
+        githubUrl: action.github?.repositoryName ? `https://github.com/${action.github.repositoryName}` : action.githubUrl,
+        repositoryName: action.github?.repositoryName,
+        branch: action.github?.branch,
+        commitSha: action.github?.commitSha,
+        pullRequestUrl: action.github?.pullRequestUrl,
         liveUrl: action.liveUrl,
         documentationUrl: action.documentationUrl,
         submittedAt: new Date().toISOString(),

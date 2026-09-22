@@ -13,6 +13,7 @@ import * as rosterRepo from './rosterRepository';
 import * as mentorRepo from './mentorRepository';
 import * as progressRepository from './progressRepository';
 import * as submissionRepo from './submissionRepository';
+import * as projectSubmissionRepo from './projectSubmissionRepository';
 
 export interface CheckResult {
   name: string;
@@ -124,6 +125,122 @@ export function runIsolationChecks(): { passed: boolean; results: CheckResult[] 
   results.push(check(
     'Scenario 6: switching the reports course selector only returns that course\'s progress records',
     courseBProgress.every((p) => p.courseId === courseB) && !courseBProgress.some((p) => p.studentId === studentA2.id)
+  ));
+
+  return { passed: results.every((r) => r.passed), results };
+}
+
+// Scenarios A-G from the Major Project resubmission/evaluation lifecycle spec
+// — a second, independent course/roster setup so it never interacts with
+// runIsolationChecks()'s state.
+export function runProjectResubmissionChecks(): { passed: boolean; results: CheckResult[] } {
+  const results: CheckResult[] = [];
+  const today = new Date().toISOString().slice(0, 10);
+
+  const courseP = courseRepo.createCourse({ title: 'Project Check Course P', code: 'PRJ-P' }).id;
+  const courseQ = courseRepo.createCourse({ title: 'Project Check Course Q', code: 'PRJ-Q' }).id;
+  const studentP1 = rosterRepo.createStudent({ name: 'Project Student P1', email: 'prj-p1@example.com', courseId: courseP, enrollmentDate: today, status: 'active' });
+  const studentQ1 = rosterRepo.createStudent({ name: 'Project Student Q1', email: 'prj-q1@example.com', courseId: courseQ, enrollmentDate: today, status: 'active' });
+  rosterRepo.enrollStudent({ studentId: studentP1.id, courseId: courseP, startDate: today, expectedCompletion: today });
+  rosterRepo.enrollStudent({ studentId: studentQ1.id, courseId: courseQ, startDate: today, expectedCompletion: today });
+
+  // Scenario A: no submission yet, then submit — status becomes Under Review.
+  const before = progressRepository.getOrCreateProgress(studentP1.id, courseP);
+  results.push(check('Scenario A: no submission yet starts as Not Started', before.project.status === 'Not Started' && before.project.versions.length === 0));
+  progressRepository.dispatch(studentP1.id, courseP, {
+    type: 'SUBMIT_PROJECT', githubUrl: 'https://github.com/p1/capstone', liveUrl: 'https://p1-capstone.example.com', documentationUrl: '',
+    github: { repositoryName: 'p1/capstone', branch: 'main', commitSha: 'abc1234' },
+  });
+  const afterSubmit = progressRepository.getProgress(studentP1.id, courseP)!;
+  results.push(check(
+    'Scenario A: submitting moves status to Under Review with attempt 1',
+    afterSubmit.project.status === 'Under Review' && afterSubmit.project.versions.length === 1 && afterSubmit.project.versions[0].version === 1 && afterSubmit.project.versions[0].githubUrl === 'https://github.com/p1/capstone'
+  ));
+
+  // Scenario B: mentor sees the structured evidence and evaluates Passed.
+  const pendingForP1 = projectSubmissionRepo.listPendingProjectSubmissions([studentP1.id], courseP);
+  const submissionSeenByMentor = pendingForP1[0];
+  results.push(check(
+    'Scenario B: mentor queue exposes repository/branch/commit/live evidence',
+    submissionSeenByMentor?.repositoryName === 'p1/capstone' && submissionSeenByMentor?.branch === 'main' && submissionSeenByMentor?.commitSha === 'abc1234' && submissionSeenByMentor?.liveUrl === 'https://p1-capstone.example.com'
+  ));
+  projectSubmissionRepo.evaluateProjectSubmission(studentP1.id, courseP, 1, { criteria: [{ label: 'Code Quality', score: 9, maxScore: 10 }], feedback: 'Excellent work.', outcome: 'Passed' });
+  const afterPass = progressRepository.getProgress(studentP1.id, courseP)!;
+  results.push(check(
+    'Scenario B: evaluating Passed marks the latest submission Passed',
+    afterPass.project.status === 'Passed' && afterPass.project.versions[0].evaluation?.outcome === 'Passed'
+  ));
+
+  // Scenario C: a second student's submission gets Changes Requested — they
+  // must see feedback, score and be able to resubmit.
+  progressRepository.dispatch(studentQ1.id, courseQ, {
+    type: 'SUBMIT_PROJECT', githubUrl: 'https://github.com/q1/capstone', liveUrl: '', documentationUrl: '',
+    github: { repositoryName: 'q1/capstone', branch: 'main' },
+  });
+  projectSubmissionRepo.evaluateProjectSubmission(studentQ1.id, courseQ, 1, { criteria: [{ label: 'Code Quality', score: 4, maxScore: 10 }], feedback: 'Needs error handling.', outcome: 'Changes Requested' });
+  const afterChangesRequested = progressRepository.getProgress(studentQ1.id, courseQ)!;
+  results.push(check(
+    'Scenario C: evaluating Changes Requested surfaces feedback and score, and allows resubmission',
+    afterChangesRequested.project.status === 'Changes Requested' &&
+      afterChangesRequested.project.versions[0].evaluation?.feedback === 'Needs error handling.' &&
+      afterChangesRequested.project.versions[0].evaluation?.criteria[0].score === 4
+  ));
+
+  // Scenario D: student resubmits — attempt 1 -> 2, old version preserved,
+  // status back to Under Review.
+  progressRepository.dispatch(studentQ1.id, courseQ, {
+    type: 'SUBMIT_PROJECT', githubUrl: 'https://github.com/q1/capstone', liveUrl: '', documentationUrl: '',
+    github: { repositoryName: 'q1/capstone', branch: 'fix/error-handling' },
+  });
+  const afterResubmit = progressRepository.getProgress(studentQ1.id, courseQ)!;
+  results.push(check(
+    'Scenario D: resubmission increments the attempt, keeps the old version, and returns to Under Review',
+    afterResubmit.project.status === 'Under Review' &&
+      afterResubmit.project.versions.length === 2 &&
+      afterResubmit.project.versions[0].version === 1 &&
+      afterResubmit.project.versions[0].evaluation?.outcome === 'Changes Requested' &&
+      afterResubmit.project.versions[1].version === 2 &&
+      afterResubmit.project.versions[1].branch === 'fix/error-handling'
+  ));
+
+  // Scenario E: mentor evaluates attempt 2 — attempt 1 stays exactly as it was.
+  const attempt1Before = { ...afterResubmit.project.versions[0] };
+  projectSubmissionRepo.evaluateProjectSubmission(studentQ1.id, courseQ, 2, { criteria: [{ label: 'Code Quality', score: 9, maxScore: 10 }], feedback: 'Fixed, nice work.', outcome: 'Passed' });
+  const afterSecondEval = progressRepository.getProgress(studentQ1.id, courseQ)!;
+  results.push(check(
+    'Scenario E: evaluating attempt 2 never modifies attempt 1',
+    JSON.stringify(afterSecondEval.project.versions[0]) === JSON.stringify(attempt1Before) &&
+      afterSecondEval.project.versions[1].evaluation?.outcome === 'Passed' &&
+      afterSecondEval.project.status === 'Passed'
+  ));
+
+  // Scenario F: a student from another course submitting must never appear in
+  // the first course's pending queue.
+  progressRepository.dispatch(studentP1.id, courseP, {
+    type: 'SUBMIT_PROJECT', githubUrl: 'https://github.com/p1/capstone-v2', liveUrl: '', documentationUrl: '', github: { repositoryName: 'p1/capstone-v2' },
+  });
+  const courseQPending = projectSubmissionRepo.listPendingProjectSubmissions([studentQ1.id], courseQ);
+  const courseAPendingLeak = projectSubmissionRepo.listPendingProjectSubmissions([studentP1.id], courseP).some((s) => s.studentId === studentQ1.id);
+  results.push(check(
+    'Scenario F: a submission from another course never appears in a different course\'s queue',
+    !courseAPendingLeak && courseQPending.every((s) => s.courseId === courseQ)
+  ));
+
+  // Scenario G: a legacy submission with only githubUrl/liveUrl/documentationUrl
+  // (no repositoryName/branch/commitSha/pullRequestUrl) still renders without
+  // throwing, and the missing structured fields come back undefined.
+  const legacyProgress = progressRepository.getProgress(studentP1.id, courseP)!;
+  legacyProgress.project.versions.push({ version: 3, githubUrl: 'https://github.com/p1/legacy', liveUrl: '', documentationUrl: '', submittedAt: new Date().toISOString() });
+  legacyProgress.project.status = 'Under Review';
+  const legacySubmission = projectSubmissionRepo.getProjectSubmission(studentP1.id, courseP);
+  results.push(check(
+    'Scenario G: a legacy submission missing structured GitHub fields still reads back correctly',
+    legacySubmission?.attempt === 3 &&
+      legacySubmission?.repositoryName === undefined &&
+      legacySubmission?.branch === undefined &&
+      legacySubmission?.commitSha === undefined &&
+      legacySubmission?.pullRequestUrl === undefined &&
+      legacyProgress.project.versions[2].githubUrl === 'https://github.com/p1/legacy'
   ));
 
   return { passed: results.every((r) => r.passed), results };

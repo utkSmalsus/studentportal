@@ -29,7 +29,7 @@ interface AppStateContextValue {
   submitMiniTask: (taskId: string, githubUrl: string, liveUrl: string, notes: string, github?: { repositoryName?: string; branch?: string; commitSha?: string; pullRequestUrl?: string }) => void;
   submitAssessment: (assessmentId: string, answers: Record<string, number>) => void;
   advanceMilestone: (milestoneId: string, nextMilestoneId?: string) => void;
-  submitProject: (githubUrl: string, liveUrl: string, documentationUrl: string) => void;
+  submitProject: (githubUrl: string, liveUrl: string, documentationUrl: string, github?: { repositoryName?: string; branch?: string; commitSha?: string; pullRequestUrl?: string }) => void;
 }
 
 const AppStateContext = createContext<AppStateContextValue | undefined>(undefined);
@@ -65,7 +65,12 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode; studentId?:
 
   const submitAssessment = useCallback((assessmentId: string, answers: Record<string, number>) => { if (courseId) progressRepository.dispatch(studentId, courseId, { type: 'RECORD_ASSESSMENT_ATTEMPT', assessmentId, answers }); }, [studentId, courseId]);
   const advanceMilestone = useCallback((milestoneId: string, nextMilestoneId?: string) => { if (courseId) progressRepository.dispatch(studentId, courseId, { type: 'ADVANCE_MILESTONE', milestoneId, nextMilestoneId }); }, [studentId, courseId]);
-  const submitProject = useCallback((githubUrl: string, liveUrl: string, documentationUrl: string) => { if (courseId) progressRepository.dispatch(studentId, courseId, { type: 'SUBMIT_PROJECT', githubUrl, liveUrl, documentationUrl }); }, [studentId, courseId]);
+  const submitProject = useCallback(
+    (githubUrl: string, liveUrl: string, documentationUrl: string, github?: { repositoryName?: string; branch?: string; commitSha?: string; pullRequestUrl?: string }) => {
+      if (courseId) progressRepository.dispatch(studentId, courseId, { type: 'SUBMIT_PROJECT', githubUrl, liveUrl, documentationUrl, github });
+    },
+    [studentId, courseId]
+  );
 
   const value = useMemo<AppStateContextValue | undefined>(() => {
     if (!progress || !courseId) return undefined;

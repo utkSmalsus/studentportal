@@ -3,35 +3,51 @@
 // reaching into StudentProgress.project.versions directly. See
 // state/submissionTypes.ts for why storage stays embedded rather than a fully
 // separate table.
-import { ProjectSubmission } from '../../state/submissionTypes';
-import { ProjectEvaluation } from '../../state/types';
+import { ProjectSubmission, projectSubmissionId } from '../../state/submissionTypes';
+import { ProjectEvaluation, ProjectSubmissionVersion, MiniTaskStatus } from '../../state/types';
 import * as progressRepository from './progressRepository';
 import { getCourseContent } from './courseRepository';
 
 const PENDING_STATUSES = ['Under Review', 'Submitted', 'Resubmitted'];
 
-export function getProjectSubmission(studentId: string, courseId: string): ProjectSubmission | undefined {
-  const progress = progressRepository.getProgress(studentId, courseId);
-  const content = getCourseContent(courseId);
-  if (!progress || !content || progress.project.versions.length === 0) return undefined;
-  const latest = progress.project.versions[progress.project.versions.length - 1];
+function toSubmission(studentId: string, courseId: string, projectId: string, version: ProjectSubmissionVersion, isLatest: boolean, overallStatus: MiniTaskStatus): ProjectSubmission {
   return {
-    id: `${studentId}::${courseId}::project::v${latest.version}`,
+    id: projectSubmissionId(studentId, courseId, version.version),
     studentId,
     courseId,
-    projectId: content.majorProject.id,
-    repositoryName: latest.repositoryName,
-    branch: latest.branch,
-    commitSha: latest.commitSha,
-    pullRequestUrl: latest.pullRequestUrl,
-    liveUrl: latest.liveUrl,
-    documentationUrl: latest.documentationUrl,
-    submittedAt: latest.submittedAt,
-    updatedAt: latest.evaluation?.evaluatedAt || latest.submittedAt,
-    status: progress.project.status,
-    attempt: latest.version,
-    evaluation: latest.evaluation,
+    projectId,
+    repositoryName: version.repositoryName,
+    branch: version.branch,
+    commitSha: version.commitSha,
+    pullRequestUrl: version.pullRequestUrl,
+    liveUrl: version.liveUrl,
+    documentationUrl: version.documentationUrl,
+    submittedAt: version.submittedAt,
+    updatedAt: version.evaluation?.evaluatedAt || version.submittedAt,
+    // Only the latest attempt carries the record's live status (Under Review /
+    // Passed / Changes Requested) — an older, superseded attempt is evidence
+    // only, exactly like submissionRepository treats superseded Mini Task
+    // versions, so history never reads as if it were still awaiting review.
+    status: isLatest ? overallStatus : version.evaluation?.outcome || 'Changes Requested',
+    attempt: version.version,
+    evaluation: version.evaluation,
   };
+}
+
+// Every submission attempt for this student+course's Major Project, oldest
+// first — the audit/history view. Never mutated; a resubmission only ever
+// appends a new version (see progressReducer.ts's SUBMIT_PROJECT).
+export function listProjectSubmissions(studentId: string, courseId: string): ProjectSubmission[] {
+  const progress = progressRepository.getProgress(studentId, courseId);
+  const content = getCourseContent(courseId);
+  if (!progress || !content) return [];
+  const lastIndex = progress.project.versions.length - 1;
+  return progress.project.versions.map((v, i) => toSubmission(studentId, courseId, content.majorProject.id, v, i === lastIndex, progress.project.status));
+}
+
+export function getProjectSubmission(studentId: string, courseId: string): ProjectSubmission | undefined {
+  const submissions = listProjectSubmissions(studentId, courseId);
+  return submissions[submissions.length - 1];
 }
 
 // Every (studentId, courseId) pair's Major Project submission still awaiting a
