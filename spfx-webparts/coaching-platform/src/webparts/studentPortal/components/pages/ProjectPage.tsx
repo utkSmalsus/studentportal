@@ -4,7 +4,6 @@ import { PageHeader, Card, SectionTitle, ProgressBar, PrimaryButton, SecondaryBu
 import { CheckIcon, LockIcon, RocketIcon, ClockIcon, AlertIcon } from '../../ui/icons';
 import { useAppState } from '../../state/AppStateContext';
 import * as progression from '../../state/engine/progression';
-import { majorProject, moduleDefs, getModuleById } from '../../data/selectors';
 import * as courseRepo from '../../admin/repository/courseRepository';
 import * as githubRepo from '../../admin/repository/githubRepository';
 
@@ -22,15 +21,26 @@ const TextField: React.FC<{ label: string; value: string; onChange: (v: string) 
 
 const ProjectPage: React.FC = () => {
   const { state: progress, studentId, courseId, advanceMilestone, submitProject } = useAppState();
-  const capstone = getModuleById(majorProject.moduleId);
-  const isLocked = capstone ? !progression.isModuleUnlocked(capstone, moduleDefs, progress) : true;
+  // Course-scoped content for THIS student's own course — never the mirrored
+  // "active" course (data/selectors), so a student in a different course from
+  // whoever the admin currently has open still sees their own Major Project.
+  const content = courseRepo.getCourseContent(courseId);
 
   const [expandedMilestone, setExpandedMilestone] = useState<string | undefined>();
   const [githubUrl, setGithubUrl] = useState('');
   const [branch, setBranch] = useState('');
+  const [commitSha, setCommitSha] = useState('');
   const [pullRequestUrl, setPullRequestUrl] = useState('');
   const [liveUrl, setLiveUrl] = useState('');
   const [docsUrl, setDocsUrl] = useState('');
+
+  if (!content) {
+    return <EmptyState title="Course content not found" description="This student's course could not be loaded." icon={<LockIcon className="w-5 h-5" />} />;
+  }
+
+  const { majorProject, moduleDefs } = content;
+  const capstone = moduleDefs.find((m) => m.id === majorProject.moduleId);
+  const isLocked = capstone ? !progression.isModuleUnlocked(capstone, moduleDefs, progress) : true;
 
   if (isLocked && capstone) {
     return (
@@ -70,12 +80,14 @@ const ProjectPage: React.FC = () => {
     submitProject(effectiveGithubUrl, liveUrl, docsUrl, {
       repositoryName: repoLink?.repositoryName,
       branch: branch || undefined,
+      commitSha: commitSha || undefined,
       pullRequestUrl: pullRequestUrl || undefined,
     });
     if (repoLink) {
-      githubRepo.recordActivity(studentId, courseId, repoLink.repositoryName, 'push', { branch: branch || undefined, message: `Submit "${majorProject.title}"` });
+      githubRepo.recordActivity(studentId, courseId, repoLink.repositoryName, 'push', { branch: branch || undefined, message: `Submit "${majorProject.title}"`, sha: commitSha || undefined });
     }
     setBranch('');
+    setCommitSha('');
     setPullRequestUrl('');
   };
 
@@ -225,6 +237,12 @@ const ProjectPage: React.FC = () => {
                   {latestSubmission.branch}
                 </div>
               )}
+              {latestSubmission.commitSha && (
+                <div>
+                  <span className="text-slate-400">Commit: </span>
+                  <span className="font-mono text-xs">{latestSubmission.commitSha}</span>
+                </div>
+              )}
               {latestSubmission.pullRequestUrl && (
                 <div>
                   <span className="text-slate-400">Pull Request: </span>
@@ -279,6 +297,7 @@ const ProjectPage: React.FC = () => {
                 <TextField label="GitHub Repository" value={githubUrl} onChange={setGithubUrl} placeholder="https://github.com/you/project" />
               )}
               <TextField label="Branch" value={branch} onChange={setBranch} placeholder="main" />
+              <TextField label="Commit SHA" value={commitSha} onChange={setCommitSha} placeholder="a1b2c3d" />
               {showPullRequestField && <TextField label="Pull Request URL" value={pullRequestUrl} onChange={setPullRequestUrl} placeholder="https://github.com/you/project/pull/1" />}
               <TextField label="Live URL" value={liveUrl} onChange={setLiveUrl} />
               <TextField label="Documentation" value={docsUrl} onChange={setDocsUrl} />

@@ -139,6 +139,11 @@ export function runProjectResubmissionChecks(): { passed: boolean; results: Chec
 
   const courseP = courseRepo.createCourse({ title: 'Project Check Course P', code: 'PRJ-P' }).id;
   const courseQ = courseRepo.createCourse({ title: 'Project Check Course Q', code: 'PRJ-Q' }).id;
+  // Distinct Major Project content per course (mirrors MERN vs SPFx having
+  // their own capstones) — proves ProjectPage's course-scoped lookup actually
+  // matters, not just that two empty projects happen to look identical.
+  courseRepo.getCourseContent(courseP)!.majorProject.title = 'P Capstone Project';
+  courseRepo.getCourseContent(courseQ)!.majorProject.title = 'Q Capstone Project';
   const studentP1 = rosterRepo.createStudent({ name: 'Project Student P1', email: 'prj-p1@example.com', courseId: courseP, enrollmentDate: today, status: 'active' });
   const studentQ1 = rosterRepo.createStudent({ name: 'Project Student Q1', email: 'prj-q1@example.com', courseId: courseQ, enrollmentDate: today, status: 'active' });
   rosterRepo.enrollStudent({ studentId: studentP1.id, courseId: courseP, startDate: today, expectedCompletion: today });
@@ -175,32 +180,35 @@ export function runProjectResubmissionChecks(): { passed: boolean; results: Chec
   // must see feedback, score and be able to resubmit.
   progressRepository.dispatch(studentQ1.id, courseQ, {
     type: 'SUBMIT_PROJECT', githubUrl: 'https://github.com/q1/capstone', liveUrl: '', documentationUrl: '',
-    github: { repositoryName: 'q1/capstone', branch: 'main' },
+    github: { repositoryName: 'q1/capstone', branch: 'main', commitSha: 'c1c1c1c' },
   });
   projectSubmissionRepo.evaluateProjectSubmission(studentQ1.id, courseQ, 1, { criteria: [{ label: 'Code Quality', score: 4, maxScore: 10 }], feedback: 'Needs error handling.', outcome: 'Changes Requested' });
   const afterChangesRequested = progressRepository.getProgress(studentQ1.id, courseQ)!;
   results.push(check(
-    'Scenario C: evaluating Changes Requested surfaces feedback and score, and allows resubmission',
+    'Scenario C: evaluating Changes Requested surfaces feedback, score and the submitted commit SHA, and allows resubmission',
     afterChangesRequested.project.status === 'Changes Requested' &&
       afterChangesRequested.project.versions[0].evaluation?.feedback === 'Needs error handling.' &&
-      afterChangesRequested.project.versions[0].evaluation?.criteria[0].score === 4
+      afterChangesRequested.project.versions[0].evaluation?.criteria[0].score === 4 &&
+      afterChangesRequested.project.versions[0].commitSha === 'c1c1c1c'
   ));
 
-  // Scenario D: student resubmits — attempt 1 -> 2, old version preserved,
-  // status back to Under Review.
+  // Scenario D: student resubmits with a NEW commit SHA — attempt 1 -> 2, old
+  // version (and its commitSha) preserved, status back to Under Review.
   progressRepository.dispatch(studentQ1.id, courseQ, {
     type: 'SUBMIT_PROJECT', githubUrl: 'https://github.com/q1/capstone', liveUrl: '', documentationUrl: '',
-    github: { repositoryName: 'q1/capstone', branch: 'fix/error-handling' },
+    github: { repositoryName: 'q1/capstone', branch: 'fix/error-handling', commitSha: 'd2d2d2d' },
   });
   const afterResubmit = progressRepository.getProgress(studentQ1.id, courseQ)!;
   results.push(check(
-    'Scenario D: resubmission increments the attempt, keeps the old version, and returns to Under Review',
+    'Scenario D: resubmission increments the attempt, keeps the old version\'s commitSha, and returns to Under Review',
     afterResubmit.project.status === 'Under Review' &&
       afterResubmit.project.versions.length === 2 &&
       afterResubmit.project.versions[0].version === 1 &&
+      afterResubmit.project.versions[0].commitSha === 'c1c1c1c' &&
       afterResubmit.project.versions[0].evaluation?.outcome === 'Changes Requested' &&
       afterResubmit.project.versions[1].version === 2 &&
-      afterResubmit.project.versions[1].branch === 'fix/error-handling'
+      afterResubmit.project.versions[1].branch === 'fix/error-handling' &&
+      afterResubmit.project.versions[1].commitSha === 'd2d2d2d'
   ));
 
   // Scenario E: mentor evaluates attempt 2 — attempt 1 stays exactly as it was.
@@ -241,6 +249,16 @@ export function runProjectResubmissionChecks(): { passed: boolean; results: Chec
       legacySubmission?.commitSha === undefined &&
       legacySubmission?.pullRequestUrl === undefined &&
       legacyProgress.project.versions[2].githubUrl === 'https://github.com/p1/legacy'
+  ));
+
+  // Scenarios 8/9: each student's course-scoped content lookup (what
+  // ProjectPage now does via courseRepo.getCourseContent(courseId) instead of
+  // the mirrored data/selectors) returns THEIR OWN course's Major Project.
+  const pContent = courseRepo.getCourseContent(courseP);
+  const qContent = courseRepo.getCourseContent(courseQ);
+  results.push(check(
+    'Scenario 8/9: each course\'s content lookup returns its own Major Project, never the other\'s',
+    pContent?.majorProject.title === 'P Capstone Project' && qContent?.majorProject.title === 'Q Capstone Project'
   ));
 
   return { passed: results.every((r) => r.passed), results };
