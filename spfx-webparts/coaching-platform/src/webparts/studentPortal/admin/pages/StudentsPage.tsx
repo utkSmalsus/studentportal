@@ -5,15 +5,12 @@ import { AdminTable, AdminColumn, StatusBadge, Drawer, FormField, Select } from 
 import { SemanticColor } from '../../ui/statusMeta';
 import * as courseRepo from '../repository/courseRepository';
 import * as rosterRepo from '../repository/rosterRepository';
+import { getStudentProgressView } from '../repository/progressView';
 import { StudentRecord, StudentStatus } from '../types';
-import * as progression from '../../state/engine/progression';
-import { useAppState } from '../../state/AppStateContext';
-import { moduleDefs as activeModuleDefs, course as activeCourse } from '../../data/selectors';
 
 const statusColor: Record<StudentStatus, SemanticColor> = { active: 'green', paused: 'amber', completed: 'blue', dropped: 'red' };
 
 const StudentsPage: React.FC = () => {
-  const { state: liveProgress } = useAppState();
   const students = rosterRepo.listStudents();
   const courses = courseRepo.listCourses();
   const batches = rosterRepo.listBatches();
@@ -24,13 +21,11 @@ const StudentsPage: React.FC = () => {
     { key: 'email', label: 'Email', render: (s) => s.email },
     { key: 'course', label: 'Course', render: (s) => courses.find((c) => c.id === s.courseId)?.title || '—' },
     { key: 'batch', label: 'Batch', render: (s) => batches.find((b) => b.id === s.batchId)?.name || '—' },
-    {
-      key: 'progress',
-      label: 'Progress',
-      render: (s) => (s.isLiveDemoStudent ? `${progression.courseOverallProgress(activeCourse, activeModuleDefs, liveProgress)}%` : '—'),
-    },
+    { key: 'progress', label: 'Progress', render: (s) => `${getStudentProgressView(s.id, s.courseId)?.overallPercent ?? 0}%` },
     { key: 'status', label: 'Status', render: (s) => <StatusBadge color={statusColor[s.status]}>{s.status}</StatusBadge> },
   ];
+
+  const selectedView = selected ? getStudentProgressView(selected.id, selected.courseId) : undefined;
 
   return (
     <div>
@@ -61,17 +56,17 @@ const StudentsPage: React.FC = () => {
             <div className="text-sm text-slate-500">
               Enrolled {selected.enrollmentDate} &middot; Course: {courses.find((c) => c.id === selected.courseId)?.title || '—'}
             </div>
-            {selected.isLiveDemoStudent ? (
+            {selectedView && (
               <div className="pt-3 border-t border-slate-100">
-                <p className="text-xs text-slate-400 mb-2">This is the live demo student — their journey, submissions and assessments are the real, shared app state.</p>
+                {selected.isLiveDemoStudent && (
+                  <p className="text-xs text-slate-400 mb-2">This is the live demo student — their journey, submissions and assessments are the real, shared app state.</p>
+                )}
                 <div className="text-sm space-y-1.5">
-                  <div>Current progress: {progression.courseOverallProgress(activeCourse, activeModuleDefs, liveProgress)}%</div>
-                  <div>Coding streak: {liveProgress.codingStreak.current} days</div>
-                  <div>Mini tasks: {Object.keys(liveProgress.miniTasks).filter((id) => liveProgress.miniTasks[id].status === 'Passed').length} passed</div>
+                  <div>Current progress: {selectedView.overallPercent}%</div>
+                  <div>Coding streak: {selectedView.progress.codingStreak.current} days</div>
+                  <div>Mini tasks: {Object.keys(selectedView.progress.miniTasks).filter((id) => selectedView.progress.miniTasks[id].status === 'Passed').length} passed</div>
                 </div>
               </div>
-            ) : (
-              <p className="text-xs text-slate-400 pt-3 border-t border-slate-100">Roster/demo record — no live session backs this student in this environment.</p>
             )}
           </div>
         )}

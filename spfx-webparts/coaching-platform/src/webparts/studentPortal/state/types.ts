@@ -122,3 +122,15 @@ export interface StudentProgressState {
   project: ProjectProgressState;
   notifications: NotificationItem[];
 }
+
+// A student's progress is always scoped to ONE course — this is the record
+// studentProgressRepository actually stores/returns. StudentProgressState above
+// stays the "what has this student done in this course" shape; this just adds
+// the identity/audit fields around it. See admin/repository/progressRepository.ts.
+export interface StudentProgress extends StudentProgressState {
+  id: string;
+  studentId: string;
+  courseId: string;
+  createdAt: string;
+  updatedAt: string;
+}

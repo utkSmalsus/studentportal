@@ -4,25 +4,20 @@ import { BackLink, Card, SectionTitle, StatusPill, EmptyState } from '../../ui/P
 import * as mentorRepo from '../../admin/repository/mentorRepository';
 import * as courseRepo from '../../admin/repository/courseRepository';
 import * as githubRepo from '../../admin/repository/githubRepository';
-import { useAppState } from '../../state/AppStateContext';
+import { getStudentProgressView } from '../../admin/repository/progressView';
 import * as progression from '../../state/engine/progression';
-import { moduleDefs as activeModuleDefs, course as activeCourse, getMiniTaskById, getAssessmentById } from '../../data/selectors';
 
 const MentorStudentDetailPage: React.FC<{ mentorId: string; studentId: string; onNavigate: (r: MentorRoute) => void }> = ({ mentorId, studentId, onNavigate }) => {
-  const { state: liveProgress } = useAppState();
   const student = mentorRepo.getStudentsForMentor(mentorId).find((s) => s.id === studentId);
   const courses = courseRepo.listCourses();
 
   if (!student) return <EmptyState title="Student not found or not assigned to you" />;
 
-  const isLive = !!student.isLiveDemoStudent;
+  const view = getStudentProgressView(studentId, student.courseId);
   const connection = githubRepo.getConnection(studentId);
   const repoLink = githubRepo.getRepositoryLink(studentId, student.courseId);
   const snapshot = repoLink ? githubRepo.getRepository(repoLink.owner, repoLink.repositoryName.split('/')[1]) : undefined;
   const activity = githubRepo.listActivityForStudent(studentId);
-
-  const overallProgress = isLive ? progression.courseOverallProgress(activeCourse, activeModuleDefs, liveProgress) : 0;
-  const current = isLive ? progression.currentModule(activeCourse, activeModuleDefs, liveProgress) : undefined;
 
   return (
     <div>
@@ -45,26 +40,26 @@ const MentorStudentDetailPage: React.FC<{ mentorId: string; studentId: string; o
         <div className="lg:col-span-2 space-y-6">
           <Card>
             <SectionTitle>Progress</SectionTitle>
-            {isLive ? (
+            {view ? (
               <dl className="grid grid-cols-2 gap-4 text-sm">
-                <div><dt className="text-slate-400">Overall Progress</dt><dd className="text-lg font-bold text-slate-900">{overallProgress}%</dd></div>
-                <div><dt className="text-slate-400">Current Module</dt><dd className="text-lg font-bold text-slate-900">{current?.title || 'Complete'}</dd></div>
-                <div><dt className="text-slate-400">Coding Streak</dt><dd className="text-lg font-bold text-slate-900">{liveProgress.codingStreak.current} days</dd></div>
-                <div><dt className="text-slate-400">Mini Tasks Passed</dt><dd className="text-lg font-bold text-slate-900">{Object.keys(liveProgress.miniTasks).filter((id) => liveProgress.miniTasks[id].status === 'Passed').length}</dd></div>
+                <div><dt className="text-slate-400">Overall Progress</dt><dd className="text-lg font-bold text-slate-900">{view.overallPercent}%</dd></div>
+                <div><dt className="text-slate-400">Current Module</dt><dd className="text-lg font-bold text-slate-900">{view.currentModuleTitle}</dd></div>
+                <div><dt className="text-slate-400">Coding Streak</dt><dd className="text-lg font-bold text-slate-900">{view.progress.codingStreak.current} days</dd></div>
+                <div><dt className="text-slate-400">Mini Tasks Passed</dt><dd className="text-lg font-bold text-slate-900">{Object.keys(view.progress.miniTasks).filter((id) => view.progress.miniTasks[id].status === 'Passed').length}</dd></div>
               </dl>
             ) : (
-              <p className="text-sm text-slate-400">No live progress session for this roster student in this environment.</p>
+              <p className="text-sm text-slate-400">This student&apos;s course could not be found.</p>
             )}
           </Card>
 
-          {isLive && (
+          {view && (
             <Card>
               <SectionTitle>Journey</SectionTitle>
               <ul className="space-y-1.5">
-                {activeCourse.moduleOrder.map((id) => {
-                  const m = activeModuleDefs.find((mm) => mm.id === id);
+                {view.content.course.moduleOrder.map((id) => {
+                  const m = view.content.moduleDefs.find((mm) => mm.id === id);
                   if (!m) return null;
-                  const status = progression.getModuleStatus(m, activeModuleDefs, liveProgress);
+                  const status = progression.getModuleStatus(m, view.content.moduleDefs, view.progress);
                   const color = status === 'completed' ? 'green' : status === 'current' ? 'blue' : 'gray';
                   return (
                     <li key={id} className="flex items-center justify-between text-sm py-1">
@@ -77,13 +72,13 @@ const MentorStudentDetailPage: React.FC<{ mentorId: string; studentId: string; o
             </Card>
           )}
 
-          {isLive && (
+          {view && (
             <Card>
               <SectionTitle>Mini Tasks</SectionTitle>
               <ul className="space-y-2 text-sm">
-                {Object.keys(liveProgress.miniTasks).map((taskId) => {
-                  const task = getMiniTaskById(taskId);
-                  const entry = liveProgress.miniTasks[taskId];
+                {Object.keys(view.progress.miniTasks).map((taskId) => {
+                  const task = view.content.miniTasks.find((t) => t.id === taskId);
+                  const entry = view.progress.miniTasks[taskId];
                   if (!task || entry.status === 'Not Started') return null;
                   const latest = entry.versions[entry.versions.length - 1];
                   return (
@@ -100,13 +95,13 @@ const MentorStudentDetailPage: React.FC<{ mentorId: string; studentId: string; o
             </Card>
           )}
 
-          {isLive && (
+          {view && (
             <Card>
               <SectionTitle>Assessments</SectionTitle>
               <ul className="space-y-2 text-sm">
-                {Object.keys(liveProgress.assessments).map((assessmentId) => {
-                  const assessment = getAssessmentById(assessmentId);
-                  const entry = liveProgress.assessments[assessmentId];
+                {Object.keys(view.progress.assessments).map((assessmentId) => {
+                  const assessment = view.content.assessments.find((a) => a.id === assessmentId);
+                  const entry = view.progress.assessments[assessmentId];
                   if (!assessment || entry.attempts.length === 0) return null;
                   const latest = entry.attempts[entry.attempts.length - 1];
                   return (
@@ -190,7 +185,7 @@ const MentorStudentDetailPage: React.FC<{ mentorId: string; studentId: string; o
 
           <Card>
             <SectionTitle>Activity Timeline</SectionTitle>
-            {activity.length === 0 && (isLive ? liveProgress.notifications.length === 0 : true) ? (
+            {activity.length === 0 && (!view || view.progress.notifications.length === 0) ? (
               <p className="text-sm text-slate-400">No activity yet.</p>
             ) : (
               <ul className="space-y-2.5 text-sm">
@@ -199,8 +194,8 @@ const MentorStudentDetailPage: React.FC<{ mentorId: string; studentId: string; o
                     GitHub: {a.action} {a.branch ? `on ${a.branch}` : ''} — {new Date(a.createdAt).toLocaleDateString()}
                   </li>
                 ))}
-                {isLive &&
-                  liveProgress.notifications.slice(0, 6).map((n) => (
+                {view &&
+                  view.progress.notifications.slice(0, 6).map((n) => (
                     <li key={n.id} className="text-slate-600">
                       {n.message} — {new Date(n.date).toLocaleDateString()}
                     </li>

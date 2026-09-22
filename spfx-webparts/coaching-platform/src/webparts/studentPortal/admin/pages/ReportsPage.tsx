@@ -2,68 +2,81 @@ import * as React from 'react';
 import { PageHeader, Card, SectionTitle } from '../../ui/Primitives';
 import { AdminTable, AdminColumn } from '../ui/AdminPrimitives';
 import * as rosterRepo from '../repository/rosterRepository';
-import { useAppState } from '../../state/AppStateContext';
+import * as progressRepository from '../repository/progressRepository';
 import * as progression from '../../state/engine/progression';
 import { moduleDefs, course, assessments } from '../../data/selectors';
 import { ModuleDef, AssessmentDef } from '../../data/types';
+import { AssessmentAttemptRecord } from '../../state/types';
 
-// ponytail: this SPFx demo has exactly one student with a real, live progress
-// state (see state/AppStateContext.tsx) — every table below reports on that
-// student honestly rather than fabricating aggregate numbers across a roster
-// that has no backing session. A real backend replaces this with a genuine
-// multi-student rollup with no change to the page shape.
+// Real per-student data aggregated across every student enrolled in this
+// course — see admin/repository/progressRepository.ts.getProgressForCourse.
+// No single "current" student's state drives these numbers anymore.
 const ReportsPage: React.FC = () => {
-  const { state: liveProgress } = useAppState();
   const students = rosterRepo.listStudents();
-  const liveStudent = students.find((s) => s.isLiveDemoStudent);
   const rosterEvals = rosterRepo.listRosterEvaluations();
+  const courseProgress = progressRepository.getProgressForCourse(course.id);
+  const enrolledCount = Math.max(courseProgress.length, 1);
 
   const moduleColumns: AdminColumn<ModuleDef>[] = [
     { key: 'module', label: 'Module', render: (m) => m.title },
     { key: 'topics', label: 'Topics', render: (m) => m.topics.length },
-    { key: 'status', label: `${liveStudent?.name || 'Student'} Status`, render: (m) => progression.getModuleStatus(m, moduleDefs, liveProgress) },
-    { key: 'progress', label: 'Progress', render: (m) => `${progression.moduleProgressPercent(m, liveProgress)}%` },
+    {
+      key: 'students',
+      label: 'Students Completed',
+      render: (m) => courseProgress.filter((p) => progression.getModuleStatus(m, moduleDefs, p) === 'completed').length,
+    },
+    {
+      key: 'avgProgress',
+      label: 'Average Progress',
+      render: (m) => `${Math.round(courseProgress.reduce((sum, p) => sum + progression.moduleProgressPercent(m, p), 0) / enrolledCount)}%`,
+    },
   ];
 
   const assessmentColumns: AdminColumn<AssessmentDef>[] = [
     { key: 'title', label: 'Assessment', render: (a) => a.title },
-    { key: 'attempts', label: 'Attempts', render: (a) => liveProgress.assessments[a.id]?.attempts.length || 0 },
+    { key: 'attempts', label: 'Attempts', render: (a) => courseProgress.reduce((sum, p) => sum + (p.assessments[a.id]?.attempts.length || 0), 0) },
     {
-      key: 'pass',
-      label: 'Result',
+      key: 'passRate',
+      label: 'Pass Rate',
       render: (a) => {
-        const entry = liveProgress.assessments[a.id];
-        if (!entry || entry.attempts.length === 0) return 'Not attempted';
-        return entry.attempts.some((att) => att.passed) ? 'Passed' : 'Not yet passed';
+        const attempted = courseProgress.filter((p) => (p.assessments[a.id]?.attempts.length || 0) > 0);
+        if (attempted.length === 0) return '—';
+        const passed = attempted.filter((p) => p.assessments[a.id].attempts.some((att) => att.passed)).length;
+        return `${Math.round((passed / attempted.length) * 100)}%`;
       },
     },
     {
       key: 'avg',
       label: 'Average Score',
       render: (a) => {
-        const entry = liveProgress.assessments[a.id];
-        if (!entry || entry.attempts.length === 0) return '—';
-        return `${Math.round(entry.attempts.reduce((s, att) => s + att.scorePercent, 0) / entry.attempts.length)}%`;
+        const allAttempts = courseProgress.reduce<AssessmentAttemptRecord[]>((all, p) => all.concat(p.assessments[a.id]?.attempts || []), []);
+        if (allAttempts.length === 0) return '—';
+        return `${Math.round(allAttempts.reduce((s, att) => s + att.scorePercent, 0) / allAttempts.length)}%`;
       },
     },
   ];
 
   const miniTaskCounts = { submitted: 0, underReview: 0, passed: 0, changesRequested: 0 };
-  Object.keys(liveProgress.miniTasks).map((id) => liveProgress.miniTasks[id]).forEach((t) => {
-    if (t.status === 'Passed') miniTaskCounts.passed += 1;
-    else if (t.status === 'Changes Requested') miniTaskCounts.changesRequested += 1;
-    else if (t.status !== 'Not Started') miniTaskCounts.underReview += 1;
+  courseProgress.forEach((p) => {
+    Object.keys(p.miniTasks).forEach((id) => {
+      const t = p.miniTasks[id];
+      if (t.status === 'Passed') miniTaskCounts.passed += 1;
+      else if (t.status === 'Changes Requested') miniTaskCounts.changesRequested += 1;
+      else if (t.status !== 'Not Started') miniTaskCounts.underReview += 1;
+    });
   });
   rosterEvals
-    .filter((e) => e.kind === 'miniTask')
+    .filter((e) => e.kind === 'project')
     .forEach((e) => {
       if (e.status === 'Passed') miniTaskCounts.passed += 1;
       else if (e.status === 'Changes Requested') miniTaskCounts.changesRequested += 1;
       else miniTaskCounts.underReview += 1;
     });
 
-  const solvedDays = Object.keys(liveProgress.coding).filter((id) => liveProgress.coding[id].attempts.some((a) => a.passed)).length;
-  const attemptedDays = Object.keys(liveProgress.coding).filter((id) => liveProgress.coding[id].attempts.length > 0).length;
+  const solvedDays = courseProgress.reduce((sum, p) => sum + Object.keys(p.coding).filter((id) => p.coding[id].attempts.some((a) => a.passed)).length, 0);
+  const attemptedDays = courseProgress.reduce((sum, p) => sum + Object.keys(p.coding).filter((id) => p.coding[id].attempts.length > 0).length, 0);
+  const avgCurrentStreak = courseProgress.length > 0 ? Math.round(courseProgress.reduce((sum, p) => sum + p.codingStreak.current, 0) / enrolledCount) : 0;
+  const bestStreak = courseProgress.reduce((max, p) => Math.max(max, p.codingStreak.best), 0);
 
   return (
     <div>
@@ -71,7 +84,7 @@ const ReportsPage: React.FC = () => {
 
       <div className="space-y-8">
         <div>
-          <SectionTitle>Module Performance — {course.title}</SectionTitle>
+          <SectionTitle>Module Performance — {course.title} ({students.length} students)</SectionTitle>
           <AdminTable columns={moduleColumns} rows={moduleDefs} rowKey={(m) => m.id} />
         </div>
 
@@ -85,26 +98,26 @@ const ReportsPage: React.FC = () => {
             <SectionTitle>Daily Coding</SectionTitle>
             <dl className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <dt className="text-slate-500">Days attempted</dt>
+                <dt className="text-slate-500">Days attempted (all students)</dt>
                 <dd className="font-semibold text-slate-900">{attemptedDays}</dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-slate-500">Days solved</dt>
+                <dt className="text-slate-500">Days solved (all students)</dt>
                 <dd className="font-semibold text-slate-900">{solvedDays}</dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-slate-500">Current streak</dt>
-                <dd className="font-semibold text-slate-900">{liveProgress.codingStreak.current} days</dd>
+                <dt className="text-slate-500">Average current streak</dt>
+                <dd className="font-semibold text-slate-900">{avgCurrentStreak} days</dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-slate-500">Best streak</dt>
-                <dd className="font-semibold text-slate-900">{liveProgress.codingStreak.best} days</dd>
+                <dt className="text-slate-500">Best streak (any student)</dt>
+                <dd className="font-semibold text-slate-900">{bestStreak} days</dd>
               </div>
             </dl>
           </Card>
 
           <Card>
-            <SectionTitle>Mini Tasks</SectionTitle>
+            <SectionTitle>Mini Tasks &amp; Projects</SectionTitle>
             <dl className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <dt className="text-slate-500">Passed</dt>

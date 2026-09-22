@@ -35,6 +35,24 @@ const completedTopicIds: [string, number][] = [
   ['react-projects-t1', 18],
 ];
 
+// A brand-new enrollment with no history yet — what studentProgressRepository
+// falls back to when a student+course combination has no seeded narrative
+// (e.g. a newly created student, or enrollment into a freshly authored course).
+export function createEmptyProgressState(): StudentProgressState {
+  return {
+    topics: {},
+    practiceStatus: {},
+    coding: {},
+    codingCurrentDay: 1,
+    codingStreak: { current: 0, best: 0 },
+    miniTasks: {},
+    moduleTests: {},
+    assessments: {},
+    project: { milestoneStatus: {} },
+    notifications: [],
+  };
+}
+
 export function createInitialProgressState(): StudentProgressState {
   const topics: Record<string, TopicProgressEntry> = {};
   completedTopicIds.forEach(([id, days]) => { topics[id] = passedTopic(days); });

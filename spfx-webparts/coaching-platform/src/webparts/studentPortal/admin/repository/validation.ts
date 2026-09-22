@@ -27,3 +27,14 @@ export function assertCourseExists(courseId: string): void {
 export function assertMentorExists(mentorId: string): void {
   if (!state.mentors.some((m) => m.id === mentorId)) throw new CrossCourseError(`Mentor "${mentorId}" does not exist.`);
 }
+
+export function assertStudentExists(studentId: string): void {
+  if (!state.students.some((s) => s.id === studentId)) throw new CrossCourseError(`Student "${studentId}" does not exist.`);
+}
+
+// A student must have an enrollment record for a course before a progress
+// record can exist for it — progress never gets created "just in case".
+export function assertStudentEnrolledInCourse(studentId: string, courseId: string): void {
+  const enrolled = state.enrollments.some((e) => e.studentId === studentId && e.courseId === courseId);
+  if (!enrolled) throw new CrossCourseError(`Student "${studentId}" is not enrolled in course "${courseId}".`);
+}

@@ -20,9 +20,11 @@ import {
   DEFAULT_TIMELINE, DEFAULT_PROGRESSION_RULES, DEFAULT_GITHUB_SETTINGS, CertificateConfig, NotificationRule,
   Mentor, GitHubConnection, GitHubRepositoryLink, GitHubActivityItem, GitHubRepositorySnapshot,
 } from '../types';
+import { StudentProgress } from '../../state/types';
+import { createInitialProgressState, createEmptyProgressState } from '../../state/initialState';
 
 const STORAGE_KEY = 'coachingPlatform.adminStore.v1';
-const STORE_SCHEMA_VERSION = 2;
+const STORE_SCHEMA_VERSION = 3;
 
 export interface StoreShape {
   schemaVersion: number;
@@ -42,6 +44,10 @@ export interface StoreShape {
   // Keyed by "owner/repo" — the simulated GitHub-side state (branches/commits/
   // PRs) the mock provider serves. See admin/repository/githubRepository.ts.
   githubRepoSnapshots: Record<string, GitHubRepositorySnapshot>;
+  // One record per (studentId, courseId) — see admin/repository/progressRepository.ts.
+  // This, not a single global StudentProgressState, is the source of truth for
+  // what any given student has done in any given course.
+  progressRecords: StudentProgress[];
 }
 
 export function clone<T>(value: T): T {
@@ -157,13 +163,71 @@ function buildSeedRoster(): Pick<StoreShape, 'batches' | 'students' | 'enrollmen
     expectedCompletion: '2026-09-30',
     status: 'active',
   }));
+  // Mini Task rows no longer live here — see admin/repository/submissionRepository.ts,
+  // which reads real per-student StudentProgress instead. Major Project reviews
+  // still use this array (ProjectProgressState has no evaluation-status field yet).
   const rosterEvaluations: RosterEvaluationItem[] = [
-    { id: 'reval-1', kind: 'miniTask', studentId: 'student-2', courseId: 'mern', moduleId: 'react-hooks', title: 'Build a React Todo Application', submittedAt: '2026-09-19', status: 'Under Review', attempt: 1, githubUrl: 'https://github.com/priya-nair/mern-training', githubBranch: 'feature/react-todo', githubCommitSha: 'a82f31c', liveUrl: 'https://priya-todo.example.com', notes: 'First pass, feedback welcome.' },
-    { id: 'reval-2', kind: 'miniTask', studentId: 'student-3', courseId: 'mern', moduleId: 'node', title: 'Build a Node CLI Tool', submittedAt: '2026-09-18', status: 'Under Review', attempt: 1, githubUrl: 'https://github.com/arjun-mehta/mern-training', githubBranch: 'feature/node-cli', githubCommitSha: 'e91b04d' },
     { id: 'reval-3', kind: 'project', studentId: 'student-2', courseId: 'mern', moduleId: 'major-project', title: 'Full Stack E-Commerce Application — Frontend Milestone', submittedAt: '2026-09-17', status: 'Under Review', attempt: 1, githubUrl: 'https://github.com/priya-nair/mern-training', githubBranch: 'feature/ecommerce-frontend', liveUrl: 'https://priya-shop.example.com' },
   ];
   const questionBank: BankQuestion[] = [];
   return { batches, students, enrollments, rosterEvaluations, questionBank };
+}
+
+function makeProgressRecord(studentId: string, courseId: string, state: ReturnType<typeof createEmptyProgressState>): StudentProgress {
+  const now = new Date().toISOString();
+  return { id: `${studentId}::${courseId}`, studentId, courseId, createdAt: now, updatedAt: now, ...state };
+}
+
+// Every roster student gets a REAL progress record so Mentor Portal/Evaluation
+// Queue reflect genuine per-student data instead of the old static
+// rosterEvaluations rows. student-demo keeps the full rich narrative; the
+// others are lighter but still real (their own topics/mini task submissions).
+function buildSeedProgressRecords(): StudentProgress[] {
+  const demo = makeProgressRecord('student-demo', 'mern', createInitialProgressState());
+
+  const priya = createEmptyProgressState();
+  ['html-t1', 'html-t2', 'css-t1', 'css-t2', 'js-basics-t1', 'js-basics-t2', 'js-basics-t3'].forEach((id) => {
+    priya.topics[id] = { contentViewed: true, testAttempts: [{ attemptNo: 1, answers: {}, scorePercent: 88, passed: true, date: '2026-08-01T09:00:00.000Z' }] };
+  });
+  priya.miniTasks['task-react-todo'] = {
+    status: 'Under Review',
+    versions: [
+      {
+        version: 1, githubUrl: 'https://github.com/priya-nair/mern-training', githubRepositoryName: 'priya-nair/mern-training',
+        githubBranch: 'feature/react-todo', githubCommitSha: 'a82f31c', liveUrl: 'https://priya-todo.example.com',
+        notes: 'First pass, feedback welcome.', submittedAt: '2026-09-19T00:00:00.000Z',
+      },
+    ],
+  };
+  priya.project.milestoneStatus = { m1: 'completed', m2: 'completed', m3: 'completed', m4: 'completed', m5: 'current', m6: 'upcoming', m7: 'upcoming', m8: 'upcoming' };
+  priya.project.submission = { githubUrl: 'https://github.com/priya-nair/mern-training', liveUrl: 'https://priya-shop.example.com', documentationUrl: '', submittedAt: '2026-09-17T00:00:00.000Z' };
+  priya.notifications = [{ id: 'p-n1', message: '"Build a React Todo Application" submitted for review.', date: '2026-09-19T00:00:00.000Z', kind: 'success' }];
+
+  const arjun = createEmptyProgressState();
+  ['html-t1', 'html-t2', 'css-t1', 'css-t2', 'js-basics-t1', 'js-basics-t2', 'js-basics-t3', 'js-intermediate-t1', 'js-intermediate-t2', 'js-intermediate-t3'].forEach((id) => {
+    arjun.topics[id] = { contentViewed: true, testAttempts: [{ attemptNo: 1, answers: {}, scorePercent: 80, passed: true, date: '2026-08-15T09:00:00.000Z' }] };
+  });
+  arjun.miniTasks['task-node-cli'] = {
+    status: 'Under Review',
+    versions: [
+      {
+        version: 1, githubUrl: 'https://github.com/arjun-mehta/mern-training', githubRepositoryName: 'arjun-mehta/mern-training',
+        githubBranch: 'feature/node-cli', githubCommitSha: 'e91b04d', liveUrl: '',
+        notes: '', submittedAt: '2026-09-18T00:00:00.000Z',
+      },
+    ],
+  };
+  arjun.notifications = [{ id: 'a-n1', message: '"Build a Node CLI Tool" submitted for review.', date: '2026-09-18T00:00:00.000Z', kind: 'success' }];
+
+  const sana = createEmptyProgressState();
+  sana.topics['html-t1'] = { contentViewed: true, testAttempts: [] };
+
+  return [
+    demo,
+    makeProgressRecord('student-2', 'mern', priya),
+    makeProgressRecord('student-3', 'mern', arjun),
+    makeProgressRecord('student-4', 'mern', sana),
+  ];
 }
 
 const DEFAULT_NOTIFICATION_EVENTS: { event: string; description: string }[] = [
@@ -239,6 +303,7 @@ function buildSeedState(): StoreShape {
     notificationRules,
     mentors: buildSeedMentors(),
     ...github,
+    progressRecords: buildSeedProgressRecords(),
   };
 }
 
@@ -259,6 +324,16 @@ function migrate(raw: StoreShape): StoreShape {
   if (!s.notificationRules) s.notificationRules = [];
   if (!s.questionBank) s.questionBank = [];
   if (!s.rosterEvaluations) s.rosterEvaluations = [];
+
+  // Pre-v3 stores never persisted student progress at all — it lived only in
+  // React's useReducer state (state/AppStateContext.tsx), never in
+  // localStorage, so there is no old single-global record to port field by
+  // field. The one-time "migration" here is simply: give every existing
+  // roster student a real, scoped StudentProgress row the first time this
+  // runs. Guarded by the array's presence, so it only ever runs once.
+  if (!s.progressRecords) {
+    s.progressRecords = buildSeedProgressRecords().filter((p) => s.students.some((st) => st.id === p.studentId));
+  }
 
   // Students that existed before onboarding tracking was added are already
   // mid-course — treat them as already onboarded rather than forcing the wizard.

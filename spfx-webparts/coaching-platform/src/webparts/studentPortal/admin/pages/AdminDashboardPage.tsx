@@ -2,27 +2,26 @@ import * as React from 'react';
 import { AdminRoute } from '../navigation/types';
 import { PageHeader, Card, SectionTitle, MetricTile } from '../../ui/Primitives';
 import { UsersIcon, BookIcon, BuildingIcon, ClipboardIcon, ChartIcon, AwardIcon, AlertIcon } from '../../ui/icons';
-import { useAppState } from '../../state/AppStateContext';
 import * as courseRepo from '../repository/courseRepository';
 import * as rosterRepo from '../repository/rosterRepository';
-import * as progression from '../../state/engine/progression';
-import { moduleDefs, course, assessments } from '../../data/selectors';
+import * as submissionRepo from '../repository/submissionRepository';
+import { getStudentProgressView } from '../repository/progressView';
 
 const AdminDashboardPage: React.FC<{ onNavigate: (r: AdminRoute) => void }> = ({ onNavigate }) => {
-  const { state: liveProgress } = useAppState();
   const courses = courseRepo.listCourses();
   const students = rosterRepo.listStudents();
   const batches = rosterRepo.listBatches();
   const rosterEvals = rosterRepo.listRosterEvaluations();
 
-  const livePendingMiniTasks = Object.keys(liveProgress.miniTasks).filter((id) =>
-    ['Under Review', 'Submitted', 'Resubmitted'].indexOf(liveProgress.miniTasks[id].status) !== -1
-  ).length;
-  const pendingMiniTasks = rosterEvals.filter((e) => e.kind === 'miniTask' && e.status === 'Under Review').length + livePendingMiniTasks;
+  // Real per-student data across the whole roster, each scored against their
+  // OWN course — never a single "active" student's state.
+  const views = students.map((s) => ({ student: s, view: getStudentProgressView(s.id, s.courseId) })).filter((v) => v.view);
+
+  const pendingMiniTasks = students.reduce((sum, s) => sum + submissionRepo.listPendingSubmissions([s.id], s.courseId).length, 0);
   const pendingProjects = rosterEvals.filter((e) => e.kind === 'project' && e.status === 'Under Review').length;
 
-  const assessmentsCompleted = assessments.filter((a) => liveProgress.assessments[a.id]?.attempts.length > 0).length;
-  const overallProgress = progression.courseOverallProgress(course, moduleDefs, liveProgress);
+  const assessmentsCompleted = views.reduce((sum, { view }) => sum + Object.keys(view!.progress.assessments).filter((id) => view!.progress.assessments[id].attempts.length > 0).length, 0);
+  const overallProgress = views.length > 0 ? Math.round(views.reduce((sum, { view }) => sum + view!.overallPercent, 0) / views.length) : 0;
 
   const activeCourses = courses.filter((c) => c.status === 'published').length;
   const activeBatches = batches.filter((b) => b.status === 'active').length;
@@ -30,7 +29,10 @@ const AdminDashboardPage: React.FC<{ onNavigate: (r: AdminRoute) => void }> = ({
   const behindStudents = students.filter((s) => s.status === 'paused').length;
 
   const recentActivity = [
-    ...liveProgress.notifications.slice(0, 4).map((n) => ({ id: n.id, message: `${students[0]?.name || 'Student'}: ${n.message}`, date: n.date })),
+    ...views.reduce<{ id: string; message: string; date: string }[]>(
+      (rows, { student, view }) => rows.concat(view!.progress.notifications.slice(0, 2).map((n) => ({ id: n.id, message: `${student.name}: ${n.message}`, date: n.date }))),
+      []
+    ),
     ...rosterEvals.slice(0, 3).map((e) => ({ id: e.id, message: `${students.find((s) => s.id === e.studentId)?.name || 'Student'} submitted "${e.title}"`, date: e.submittedAt })),
   ]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())

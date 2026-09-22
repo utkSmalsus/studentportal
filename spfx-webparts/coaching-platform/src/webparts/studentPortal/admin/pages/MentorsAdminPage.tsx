@@ -63,7 +63,7 @@ const MentorsAdminPage: React.FC = () => {
 
   const detailBatches = detail ? mentorRepo.getBatchesForMentor(detail.id) : [];
   const detailStudents = detail ? mentorRepo.getStudentsForMentor(detail.id) : [];
-  const detailPending = detail ? mentorRepo.getPendingEvaluationsForMentor(detail.id) : [];
+  const detailPending = detail ? mentorRepo.getPendingReviewCountForMentor(detail.id) : 0;
 
   return (
     <div>
@@ -170,7 +170,7 @@ const MentorsAdminPage: React.FC = () => {
 
             <Card>
               <SectionTitle>Pending Reviews</SectionTitle>
-              <p className="text-sm text-slate-700">{detailPending.length} submission{detailPending.length === 1 ? '' : 's'} awaiting review.</p>
+              <p className="text-sm text-slate-700">{detailPending} submission{detailPending === 1 ? '' : 's'} awaiting review.</p>
             </Card>
           </div>
         )}

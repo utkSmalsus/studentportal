@@ -6,39 +6,35 @@ import { AdminTable, AdminColumn, StatusBadge, Select } from '../../admin/ui/Adm
 import { SemanticColor } from '../../ui/statusMeta';
 import * as mentorRepo from '../../admin/repository/mentorRepository';
 import * as courseRepo from '../../admin/repository/courseRepository';
-import { useAppState } from '../../state/AppStateContext';
-import * as progression from '../../state/engine/progression';
-import { moduleDefs as activeModuleDefs, course as activeCourse } from '../../data/selectors';
+import { getStudentProgressView } from '../../admin/repository/progressView';
 import { StudentRecord, StudentStatus } from '../../admin/types';
 
 const statusColor: Record<StudentStatus, SemanticColor> = { active: 'green', paused: 'amber', completed: 'blue', dropped: 'red' };
 
 const MyStudentsPage: React.FC<{ mentorId: string; onNavigate: (r: MentorRoute) => void }> = ({ mentorId, onNavigate }) => {
-  const { state: liveProgress } = useAppState();
   const courses = courseRepo.listCourses();
   const allStudents = mentorRepo.getStudentsForMentor(mentorId);
   const [statusFilter, setStatusFilter] = useState<StudentStatus | ''>('');
 
   const students = statusFilter ? allStudents.filter((s) => s.status === statusFilter) : allStudents;
 
-  const progressFor = (s: StudentRecord): number => (s.isLiveDemoStudent ? progression.courseOverallProgress(activeCourse, activeModuleDefs, liveProgress) : 0);
-  const currentModuleFor = (s: StudentRecord): string =>
-    s.isLiveDemoStudent ? progression.currentModule(activeCourse, activeModuleDefs, liveProgress)?.title || 'Complete' : '—';
-
   const columns: AdminColumn<StudentRecord>[] = [
     { key: 'name', label: 'Student', render: (s) => <span className="font-semibold text-slate-900">{s.name}</span> },
     { key: 'course', label: 'Course', render: (s) => courses.find((c) => c.id === s.courseId)?.title || '—' },
-    { key: 'progress', label: 'Progress', render: (s) => (s.isLiveDemoStudent ? `${progressFor(s)}%` : '—') },
-    { key: 'module', label: 'Current Module', render: (s) => currentModuleFor(s) },
+    { key: 'progress', label: 'Progress', render: (s) => `${getStudentProgressView(s.id, s.courseId)?.overallPercent ?? 0}%` },
+    { key: 'module', label: 'Current Module', render: (s) => getStudentProgressView(s.id, s.courseId)?.currentModuleTitle || '—' },
     {
       key: 'dailyCoding',
       label: 'Daily Coding',
-      render: (s) => (s.isLiveDemoStudent ? `${liveProgress.codingStreak.current}-day streak` : '—'),
+      render: (s) => `${getStudentProgressView(s.id, s.courseId)?.progress.codingStreak.current ?? 0}-day streak`,
     },
     {
       key: 'miniTasks',
       label: 'Mini Tasks',
-      render: (s) => (s.isLiveDemoStudent ? Object.keys(liveProgress.miniTasks).filter((id) => liveProgress.miniTasks[id].status === 'Passed').length : '—'),
+      render: (s) => {
+        const progress = getStudentProgressView(s.id, s.courseId)?.progress;
+        return progress ? Object.keys(progress.miniTasks).filter((id) => progress.miniTasks[id].status === 'Passed').length : 0;
+      },
     },
     { key: 'status', label: 'Status', render: (s) => <StatusBadge color={statusColor[s.status]}>{s.status}</StatusBadge> },
   ];

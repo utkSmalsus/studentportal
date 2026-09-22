@@ -2,8 +2,9 @@
 // is the source of truth for which students a mentor can see (section 6/59 of
 // the spec) — nothing here duplicates mentor assignment onto individual students.
 import { state, commit } from './store';
-import { Mentor, MentorStatus, Batch, StudentRecord, RosterEvaluationItem } from '../types';
+import { Mentor, MentorStatus, Batch, StudentRecord } from '../types';
 import { assertMentorExists } from './validation';
+import * as submissionRepository from './submissionRepository';
 
 export function listMentors(): Mentor[] {
   return state.mentors;
@@ -58,7 +59,14 @@ export function isStudentAssignedToMentor(mentorId: string, studentId: string): 
   return getStudentsForMentor(mentorId).some((s) => s.id === studentId);
 }
 
-export function getPendingEvaluationsForMentor(mentorId: string): RosterEvaluationItem[] {
-  const studentIds = getStudentsForMentor(mentorId).map((s) => s.id);
-  return state.rosterEvaluations.filter((e) => studentIds.indexOf(e.studentId) !== -1 && e.status === 'Under Review');
+// Real per-student mini task submissions (own course, own progress record)
+// plus the roster's still-mock Major Project review rows — see
+// admin/repository/submissionRepository.ts for why mini tasks moved off
+// rosterEvaluations and project reviews haven't (yet).
+export function getPendingReviewCountForMentor(mentorId: string): number {
+  const myStudents = getStudentsForMentor(mentorId);
+  const studentIds = myStudents.map((s) => s.id);
+  const miniTaskCount = myStudents.reduce((sum, s) => sum + submissionRepository.listPendingSubmissions([s.id], s.courseId).length, 0);
+  const projectCount = state.rosterEvaluations.filter((e) => e.kind === 'project' && studentIds.indexOf(e.studentId) !== -1 && e.status === 'Under Review').length;
+  return miniTaskCount + projectCount;
 }

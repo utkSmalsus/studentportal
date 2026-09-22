@@ -1,25 +1,37 @@
 import * as React from 'react';
 import { useState } from 'react';
 import { PageHeader, Card, SectionTitle, StatusPill } from '../../ui/Primitives';
-import { FormField, FormSection, TextInput, Select, Checkbox } from '../ui/AdminPrimitives';
+import { FormField, FormSection, TextInput, Select, Checkbox, AdminTable, AdminColumn } from '../ui/AdminPrimitives';
 import * as courseRepo from '../repository/courseRepository';
+import * as rosterRepo from '../repository/rosterRepository';
 import * as settingsRepo from '../repository/settingsRepository';
-import { useAppState } from '../../state/AppStateContext';
-import * as progression from '../../state/engine/progression';
-import { moduleDefs, course as activeCourse } from '../../data/selectors';
+import { getStudentProgressView } from '../repository/progressView';
+import { StudentRecord } from '../types';
 
 const CertificatesAdminPage: React.FC = () => {
-  const { state: liveProgress } = useAppState();
   const courses = courseRepo.listCourses();
   const [courseId, setCourseId] = useState(courses[0]?.id || '');
   const cert = settingsRepo.getCertificateForCourse(courseId) || { courseId, name: '', prefix: '', minAssessmentScorePercent: 60, requireAllModulesComplete: true, template: 'Standard' };
 
   const update = (patch: Partial<typeof cert>): void => settingsRepo.upsertCertificate(courseId, patch);
 
-  const isActiveCourse = courseId === activeCourse.id;
-  const overallProgress = isActiveCourse ? progression.courseOverallProgress(activeCourse, moduleDefs, liveProgress) : 0;
-  const allModulesComplete = isActiveCourse && moduleDefs.every((m) => progression.isModuleComplete(m, liveProgress));
-  const eligible = cert.requireAllModulesComplete ? allModulesComplete : overallProgress >= 100;
+  const enrolledStudents = rosterRepo.listStudents().filter((s) => s.courseId === courseId);
+
+  const isEligible = (s: StudentRecord): boolean => {
+    const view = getStudentProgressView(s.id, s.courseId);
+    if (!view) return false;
+    return cert.requireAllModulesComplete ? view.currentModuleTitle === 'Complete' : view.overallPercent >= 100;
+  };
+
+  const columns: AdminColumn<StudentRecord>[] = [
+    { key: 'name', label: 'Student', render: (s) => s.name },
+    { key: 'progress', label: 'Progress', render: (s) => `${getStudentProgressView(s.id, s.courseId)?.overallPercent ?? 0}%` },
+    {
+      key: 'eligible',
+      label: 'Eligibility',
+      render: (s) => <StatusPill color={isEligible(s) ? 'green' : 'gray'}>{isEligible(s) ? 'Certificate Available' : 'Not Yet Eligible'}</StatusPill>,
+    },
+  ];
 
   return (
     <div>
@@ -57,17 +69,12 @@ const CertificatesAdminPage: React.FC = () => {
           </FormField>
           <Checkbox label="Require all modules complete" checked={cert.requireAllModulesComplete} onChange={(v) => update({ requireAllModulesComplete: v })} />
         </FormSection>
-
-        {isActiveCourse && (
-          <div className="pt-4 border-t border-slate-100">
-            <SectionTitle>Live Demo Student Eligibility</SectionTitle>
-            <div className="flex items-center gap-3">
-              <StatusPill color={eligible ? 'green' : 'gray'}>{eligible ? 'Certificate Available' : 'Not Yet Eligible'}</StatusPill>
-              <span className="text-sm text-slate-500">{overallProgress}% course progress</span>
-            </div>
-          </div>
-        )}
       </Card>
+
+      <div className="mt-8 max-w-2xl">
+        <SectionTitle>Student Eligibility ({enrolledStudents.length})</SectionTitle>
+        <AdminTable columns={columns} rows={enrolledStudents} rowKey={(s) => s.id} emptyLabel="No students enrolled in this course." />
+      </div>
     </div>
   );
 };

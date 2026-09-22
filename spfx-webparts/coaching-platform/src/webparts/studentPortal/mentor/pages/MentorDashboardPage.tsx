@@ -5,12 +5,25 @@ import { UsersIcon, BuildingIcon, ClipboardIcon, AlertIcon } from '../../ui/icon
 import * as mentorRepo from '../../admin/repository/mentorRepository';
 import * as courseRepo from '../../admin/repository/courseRepository';
 import * as githubRepo from '../../admin/repository/githubRepository';
+import * as submissionRepo from '../../admin/repository/submissionRepository';
 
 const MentorDashboardPage: React.FC<{ mentorId: string; onNavigate: (r: MentorRoute) => void }> = ({ mentorId, onNavigate }) => {
   const students = mentorRepo.getStudentsForMentor(mentorId);
   const batches = mentorRepo.getBatchesForMentor(mentorId);
-  const pending = mentorRepo.getPendingEvaluationsForMentor(mentorId);
   const courses = courseRepo.listCourses();
+  const pending = students.reduce<{ id: string; studentId: string; courseId: string; title: string; submittedAt: string }[]>(
+    (rows, s) =>
+      rows.concat(
+        submissionRepo.listPendingSubmissions([s.id], s.courseId).map((sub) => ({
+          id: sub.id,
+          studentId: sub.studentId,
+          courseId: sub.courseId,
+          title: courseRepo.getCourseContent(sub.courseId)?.miniTasks.find((t) => t.id === sub.taskId)?.title || sub.taskId,
+          submittedAt: sub.submittedAt,
+        }))
+      ),
+    []
+  );
 
   const behind = students.filter((s) => s.status === 'paused');
   const liveStudent = students.find((s) => s.isLiveDemoStudent);

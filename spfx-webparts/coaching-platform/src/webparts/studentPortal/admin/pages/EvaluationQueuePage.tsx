@@ -5,8 +5,7 @@ import { AdminTable, AdminColumn, StatusBadge, Drawer, FormField, TextArea } fro
 import { SemanticColor } from '../../ui/statusMeta';
 import * as rosterRepo from '../repository/rosterRepository';
 import * as courseRepo from '../repository/courseRepository';
-import { useAppState } from '../../state/AppStateContext';
-import { getModuleById, getMiniTaskById } from '../../data/selectors';
+import * as submissionRepo from '../repository/submissionRepository';
 import { EvaluationStatus, RosterEvaluationItem } from '../types';
 
 const statusColor: Record<EvaluationStatus, SemanticColor> = { 'Under Review': 'amber', 'Changes Requested': 'amber', Passed: 'green' };
@@ -14,6 +13,8 @@ const statusColor: Record<EvaluationStatus, SemanticColor> = { 'Under Review': '
 interface QueueRow {
   id: string;
   kind: 'miniTask' | 'project';
+  studentId: string;
+  courseId: string;
   studentName: string;
   courseTitle: string;
   moduleTitle: string;
@@ -24,13 +25,10 @@ interface QueueRow {
   githubUrl?: string;
   liveUrl?: string;
   notes?: string;
-  isLive: boolean;
-  liveTaskId?: string;
-  liveVersion?: number;
+  taskId?: string;
 }
 
 const EvaluationQueuePage: React.FC = () => {
-  const { state: liveProgress, adminEvaluateMiniTask } = useAppState();
   const students = rosterRepo.listStudents();
   const courses = courseRepo.listCourses();
   const rosterEvals = rosterRepo.listRosterEvaluations();
@@ -39,55 +37,39 @@ const EvaluationQueuePage: React.FC = () => {
   const [feedback, setFeedback] = useState('');
   const [scores, setScores] = useState<Record<string, number>>({});
 
-  const liveStudent = students.find((s) => s.isLiveDemoStudent);
-  const liveRows: QueueRow[] = liveStudent
-    ? Object.keys(liveProgress.miniTasks)
-        .map((taskId) => {
-          const entry = liveProgress.miniTasks[taskId];
-          const task = getMiniTaskById(taskId);
-          const latest = entry.versions[entry.versions.length - 1];
-          if (!task || !latest || entry.status === 'Not Started') return undefined;
-          if (['Under Review', 'Submitted', 'Resubmitted'].indexOf(entry.status) === -1) return undefined;
-          const module = getModuleById(task.moduleId);
-          const row: QueueRow = {
-            id: `live-${taskId}`,
-            kind: 'miniTask',
-            studentName: liveStudent.name,
-            courseTitle: courses.find((c) => c.id === liveStudent.courseId)?.title || '',
-            moduleTitle: module?.title || '',
-            title: task.title,
-            submittedAt: latest.submittedAt,
-            status: 'Under Review',
-            attempt: latest.version,
-            githubUrl: latest.githubUrl,
-            liveUrl: latest.liveUrl,
-            notes: latest.notes,
-            isLive: true,
-            liveTaskId: taskId,
-            liveVersion: latest.version,
-          };
-          return row;
-        })
-        .filter((r): r is QueueRow => !!r)
-    : [];
+  // Every student's own course, not "the currently active one" — a submission
+  // from a student enrolled in a different course is scored against ITS
+  // content, never accidentally against whatever course an admin has open.
+  const miniTaskRows: QueueRow[] = students.reduce<QueueRow[]>((rows, s) => {
+    const content = courseRepo.getCourseContent(s.courseId);
+    return rows.concat(submissionRepo.listPendingSubmissions([s.id], s.courseId).map((sub) => ({
+      id: sub.id,
+      kind: 'miniTask' as const,
+      studentId: sub.studentId,
+      courseId: sub.courseId,
+      studentName: s.name,
+      courseTitle: courses.find((c) => c.id === s.courseId)?.title || '',
+      moduleTitle: content?.moduleDefs.find((m) => m.id === sub.moduleId)?.title || '',
+      title: content?.miniTasks.find((t) => t.id === sub.taskId)?.title || sub.taskId,
+      submittedAt: sub.submittedAt,
+      status: sub.status as EvaluationStatus,
+      attempt: sub.attempt,
+      githubUrl: sub.repositoryName ? `https://github.com/${sub.repositoryName}` : undefined,
+      liveUrl: sub.liveUrl,
+      notes: sub.notes,
+      taskId: sub.taskId,
+    })));
+  }, []);
 
-  const rosterRows: QueueRow[] = rosterEvals.map((e: RosterEvaluationItem) => ({
-    id: e.id,
-    kind: e.kind,
-    studentName: students.find((s) => s.id === e.studentId)?.name || 'Unknown',
-    courseTitle: courses.find((c) => c.id === e.courseId)?.title || '',
-    moduleTitle: getModuleById(e.moduleId)?.title || e.moduleId,
-    title: e.title,
-    submittedAt: e.submittedAt,
-    status: e.status,
-    attempt: e.attempt,
-    githubUrl: e.githubUrl,
-    liveUrl: e.liveUrl,
-    notes: e.notes,
-    isLive: false,
-  }));
+  const projectRows: QueueRow[] = rosterEvals
+    .filter((e) => e.kind === 'project')
+    .map((e: RosterEvaluationItem) => ({
+      id: e.id, kind: 'project', studentId: e.studentId, courseId: e.courseId, studentName: students.find((s) => s.id === e.studentId)?.name || 'Unknown',
+      courseTitle: courses.find((c) => c.id === e.courseId)?.title || '', moduleTitle: courseRepo.getCourseContent(e.courseId)?.moduleDefs.find((m) => m.id === e.moduleId)?.title || e.moduleId,
+      title: e.title, submittedAt: e.submittedAt, status: e.status, attempt: e.attempt, githubUrl: e.githubUrl, liveUrl: e.liveUrl, notes: e.notes,
+    }));
 
-  const rows = [...liveRows, ...rosterRows].filter((r) => r.kind === tab);
+  const rows = tab === 'miniTask' ? miniTaskRows : projectRows;
 
   const columns: AdminColumn<QueueRow>[] = [
     { key: 'student', label: 'Student', render: (r) => r.studentName },
@@ -105,21 +87,18 @@ const EvaluationQueuePage: React.FC = () => {
     setScores({});
   };
 
+  const openTaskDef = open?.kind === 'miniTask' && open.taskId ? courseRepo.getCourseContent(open.courseId)?.miniTasks.find((t) => t.id === open.taskId) : undefined;
+
   const submitOutcome = (outcome: EvaluationStatus): void => {
     if (!open) return;
-    if (open.isLive && open.liveTaskId && open.liveVersion) {
-      const task = getMiniTaskById(open.liveTaskId);
-      if (task) {
-        const criteria = task.evaluationCriteriaTemplate.map((c) => ({ label: c.label, score: scores[c.label] ?? Math.round(c.maxScore * 0.8), maxScore: c.maxScore }));
-        adminEvaluateMiniTask(open.liveTaskId, open.liveVersion, { criteria, feedback, outcome: outcome === 'Passed' ? 'Passed' : 'Changes Requested', evaluatedAt: new Date().toISOString() });
-      }
+    if (open.kind === 'miniTask' && open.taskId && openTaskDef) {
+      const criteria = openTaskDef.evaluationCriteriaTemplate.map((c) => ({ label: c.label, score: scores[c.label] ?? Math.round(c.maxScore * 0.8), maxScore: c.maxScore }));
+      submissionRepo.evaluateSubmission(open.studentId, open.courseId, open.taskId, open.attempt, { criteria, feedback, outcome: outcome === 'Passed' ? 'Passed' : 'Changes Requested' });
     } else {
       rosterRepo.submitRosterEvaluation(open.id, outcome, feedback);
     }
     setOpen(undefined);
   };
-
-  const openTask = open?.isLive && open.liveTaskId ? getMiniTaskById(open.liveTaskId) : undefined;
 
   return (
     <div>
@@ -170,11 +149,11 @@ const EvaluationQueuePage: React.FC = () => {
               </div>
             </Card>
 
-            {openTask && (
+            {openTaskDef && (
               <Card>
                 <SectionTitle>Scorecard</SectionTitle>
                 <div className="space-y-3">
-                  {openTask.evaluationCriteriaTemplate.map((c) => (
+                  {openTaskDef.evaluationCriteriaTemplate.map((c) => (
                     <div key={c.label} className="flex items-center justify-between gap-3">
                       <span className="text-sm font-medium text-slate-700">{c.label}</span>
                       <input
