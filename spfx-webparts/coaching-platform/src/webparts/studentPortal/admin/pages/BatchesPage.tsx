@@ -6,16 +6,18 @@ import { PlusIcon } from '../../ui/icons';
 import { SemanticColor } from '../../ui/statusMeta';
 import * as courseRepo from '../repository/courseRepository';
 import * as rosterRepo from '../repository/rosterRepository';
+import * as mentorRepo from '../repository/mentorRepository';
 import { Batch, BatchStatus } from '../types';
 
 const statusColor: Record<BatchStatus, SemanticColor> = { upcoming: 'blue', active: 'green', completed: 'gray' };
 
-const emptyDraft = (courseId: string): Omit<Batch, 'id'> => ({ name: '', courseId, startDate: '', endDate: '', scheduleDays: [], scheduleTime: '', instructor: '', status: 'upcoming' });
+const emptyDraft = (courseId: string): Omit<Batch, 'id'> => ({ name: '', courseId, startDate: '', endDate: '', scheduleDays: [], scheduleTime: '', mentorIds: [], primaryMentorId: undefined, status: 'upcoming' });
 
 const BatchesPage: React.FC = () => {
   const courses = courseRepo.listCourses();
   const batches = rosterRepo.listBatches();
   const students = rosterRepo.listStudents();
+  const mentors = mentorRepo.listMentors();
   const [editing, setEditing] = useState<Batch | undefined>();
   const [draft, setDraft] = useState<Omit<Batch, 'id'> | undefined>();
 
@@ -40,7 +42,7 @@ const BatchesPage: React.FC = () => {
     { key: 'course', label: 'Course', render: (b) => courses.find((c) => c.id === b.courseId)?.title || '—' },
     { key: 'schedule', label: 'Schedule', render: (b) => `${b.scheduleDays.join(', ')} · ${b.scheduleTime}` },
     { key: 'dates', label: 'Dates', render: (b) => `${b.startDate} → ${b.endDate}` },
-    { key: 'instructor', label: 'Instructor', render: (b) => b.instructor },
+    { key: 'mentors', label: 'Mentors', render: (b) => b.mentorIds.map((id) => mentors.find((m) => m.id === id)?.name).filter(Boolean).join(', ') || '—' },
     { key: 'students', label: 'Students', render: (b) => students.filter((s) => s.batchId === b.id).length },
     { key: 'status', label: 'Status', render: (b) => <StatusBadge color={statusColor[b.status]}>{b.status}</StatusBadge> },
   ];
@@ -101,8 +103,46 @@ const BatchesPage: React.FC = () => {
             <FormField label="Schedule Time">
               <TextInput value={draft.scheduleTime} onChange={(e) => setDraft({ ...draft, scheduleTime: e.target.value })} placeholder="9:00 AM – 11:00 AM" />
             </FormField>
-            <FormField label="Instructor">
-              <TextInput value={draft.instructor} onChange={(e) => setDraft({ ...draft, instructor: e.target.value })} />
+            <FormField label="Primary Mentor">
+              <Select
+                value={draft.primaryMentorId || ''}
+                onChange={(e) => {
+                  const primaryMentorId = e.target.value || undefined;
+                  const mentorIds = primaryMentorId && draft.mentorIds.indexOf(primaryMentorId) === -1 ? [...draft.mentorIds, primaryMentorId] : draft.mentorIds;
+                  setDraft({ ...draft, primaryMentorId, mentorIds });
+                }}
+              >
+                <option value="">—</option>
+                {mentors.filter((m) => m.status === 'active').map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+            <FormField label="Additional Mentors">
+              <div className="space-y-1.5">
+                {mentors
+                  .filter((m) => m.status === 'active' && m.id !== draft.primaryMentorId)
+                  .map((m) => {
+                    const checked = draft.mentorIds.indexOf(m.id) !== -1;
+                    return (
+                      <label key={m.id} className="flex items-center gap-2 text-sm text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() =>
+                            setDraft({
+                              ...draft,
+                              mentorIds: checked ? draft.mentorIds.filter((id) => id !== m.id) : [...draft.mentorIds, m.id],
+                            })
+                          }
+                        />
+                        {m.name}
+                      </label>
+                    );
+                  })}
+              </div>
             </FormField>
             <FormField label="Status">
               <Select value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value as BatchStatus })}>

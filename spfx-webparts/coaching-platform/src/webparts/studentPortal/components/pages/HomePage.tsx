@@ -7,6 +7,11 @@ import * as progression from '../../state/engine/progression';
 import { course, moduleDefs, miniTasks, majorProject, courseOverallProgress, miniTaskStats, assessmentStats, getModuleById, getMiniTaskById } from '../../data/selectors';
 import { codingQuestions } from '../../data/mockData';
 import { ModuleGroup } from '../../data/types';
+import * as rosterRepo from '../../admin/repository/rosterRepository';
+import * as mentorRepo from '../../admin/repository/mentorRepository';
+import * as githubRepo from '../../admin/repository/githubRepository';
+
+const LIVE_STUDENT_ID = 'student-demo';
 
 const GROUP_ORDER: ModuleGroup[] = ['Foundation', 'Programming', 'Frontend', 'Backend', 'Full Stack', 'Capstone'];
 const GROUP_LABEL: Record<ModuleGroup, string> = {
@@ -68,6 +73,51 @@ const Row: React.FC<{ label: string; value: string }> = ({ label, value }) => (
     <span className="font-semibold text-slate-900">{value}</span>
   </div>
 );
+
+const HomeMentorGithubCard: React.FC<{ onNavigate: (r: Route) => void }> = ({ onNavigate }) => {
+  const student = rosterRepo.getStudent(LIVE_STUDENT_ID);
+  const batch = rosterRepo.listBatches().find((b) => b.id === student?.batchId);
+  const mentor = batch?.primaryMentorId ? mentorRepo.getMentor(batch.primaryMentorId) : undefined;
+  const connection = githubRepo.getConnection(LIVE_STUDENT_ID);
+  const repoLink = student ? githubRepo.getRepositoryLink(LIVE_STUDENT_ID, student.courseId) : undefined;
+
+  if (!mentor && !connection) return null;
+
+  return (
+    <Card className="mt-6">
+      {mentor && (
+        <div className={connection ? 'mb-4 pb-4 border-b border-slate-100' : ''}>
+          <SectionTitle>Your Mentor</SectionTitle>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-semibold text-slate-900">{mentor.name}</div>
+              <div className="text-xs text-slate-400">{mentor.specialization}</div>
+            </div>
+            <button onClick={() => onNavigate({ view: 'profile' })} className="text-xs font-semibold text-indigo-600 hover:underline">
+              View
+            </button>
+          </div>
+        </div>
+      )}
+      {connection && (
+        <div>
+          <SectionTitle>GitHub</SectionTitle>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-semibold text-emerald-600">Connected ✓</div>
+              <div className="text-xs text-slate-400">{repoLink?.repositoryName || connection.username}</div>
+            </div>
+            {repoLink && (
+              <a href={`https://github.com/${repoLink.repositoryName}`} target="_blank" rel="noreferrer" className="text-xs font-semibold text-indigo-600 hover:underline">
+                Open Repository
+              </a>
+            )}
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+};
 
 const MiniTaskPlanRow: React.FC<{ index: number; moduleId: string; onNavigate: (r: Route) => void }> = ({ index, moduleId, onNavigate }) => {
   const { state: progress } = useAppState();
@@ -344,6 +394,8 @@ const HomePage: React.FC<{ userDisplayName: string; onNavigate: (r: Route) => vo
               <Row label="Mini Tasks" value={`${taskStats.completed}/${taskStats.total}`} />
             </div>
           </Card>
+
+          <HomeMentorGithubCard onNavigate={onNavigate} />
         </div>
       </div>
     </div>

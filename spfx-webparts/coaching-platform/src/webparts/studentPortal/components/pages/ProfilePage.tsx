@@ -1,11 +1,16 @@
 import * as React from 'react';
-import { Card, PageHeader, SectionTitle, MetricTile, ProgressBar } from '../../ui/Primitives';
+import { Card, PageHeader, SectionTitle, MetricTile, ProgressBar, StatusPill, SecondaryButton } from '../../ui/Primitives';
 import { ChartIcon, FlameIcon, CodeIcon, ClipboardIcon, AwardIcon } from '../../ui/icons';
 import { useAppState } from '../../state/AppStateContext';
 import * as progression from '../../state/engine/progression';
 import { profile } from '../../data/mockData';
 import { course, moduleDefs, courseOverallProgress, miniTaskStats, assessmentStats, codingStats } from '../../data/selectors';
 import { ModuleGroup } from '../../data/types';
+import * as rosterRepo from '../../admin/repository/rosterRepository';
+import * as mentorRepo from '../../admin/repository/mentorRepository';
+import * as githubRepo from '../../admin/repository/githubRepository';
+
+const LIVE_STUDENT_ID = 'student-demo';
 
 const GROUP_LABEL: Record<ModuleGroup, string> = {
   Foundation: 'Foundation',
@@ -30,8 +35,13 @@ const Row: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value
   </div>
 );
 
-const ProfilePage: React.FC<{ userDisplayName: string }> = ({ userDisplayName }) => {
+const ProfilePage: React.FC<{ userDisplayName: string; onRestartOnboarding?: () => void }> = ({ userDisplayName, onRestartOnboarding }) => {
   const { state: progress } = useAppState();
+  const student = rosterRepo.getStudent(LIVE_STUDENT_ID);
+  const batch = rosterRepo.listBatches().find((b) => b.id === student?.batchId);
+  const mentor = batch?.primaryMentorId ? mentorRepo.getMentor(batch.primaryMentorId) : undefined;
+  const connection = githubRepo.getConnection(LIVE_STUDENT_ID);
+  const repoLink = student ? githubRepo.getRepositoryLink(LIVE_STUDENT_ID, student.courseId) : undefined;
   const overallPercent = courseOverallProgress(progress);
   const current = progression.currentModule(course, moduleDefs, progress);
   const currentGroup = current?.group;
@@ -59,7 +69,7 @@ const ProfilePage: React.FC<{ userDisplayName: string }> = ({ userDisplayName })
 
   return (
     <div>
-      <PageHeader eyebrow="Account" title="Profile" />
+      <PageHeader eyebrow="Account" title="Profile" action={onRestartOnboarding && <SecondaryButton onClick={onRestartOnboarding}>Redo Onboarding</SecondaryButton>} />
 
       <Card className="mb-6">
         <div className="flex flex-wrap items-center gap-5">
@@ -137,7 +147,51 @@ const ProfilePage: React.FC<{ userDisplayName: string }> = ({ userDisplayName })
           </Card>
         </div>
 
-        <div>
+        <div className="space-y-6">
+          {mentor && (
+            <Card>
+              <SectionTitle>Your Mentor</SectionTitle>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center text-sm font-bold shrink-0">{mentor.name.charAt(0)}</div>
+                <div>
+                  <div className="text-sm font-semibold text-slate-900">{mentor.name}</div>
+                  <div className="text-xs text-slate-400">{mentor.specialization}</div>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          <Card>
+            <SectionTitle>GitHub</SectionTitle>
+            {connection ? (
+              <div className="text-sm space-y-2">
+                <div className="flex items-center gap-2">
+                  <StatusPill color="green">Connected</StatusPill>
+                  <span className="font-medium text-slate-800">{connection.username}</span>
+                </div>
+                <div className="text-xs text-slate-400">Connected {new Date(connection.connectedAt).toLocaleDateString()}</div>
+                {repoLink && (
+                  <div>
+                    <div className="text-slate-400 text-xs mt-2">Training Repository</div>
+                    <a href={`https://github.com/${repoLink.repositoryName}`} target="_blank" rel="noreferrer" className="text-indigo-600 font-medium hover:underline">
+                      {repoLink.repositoryName}
+                    </a>
+                  </div>
+                )}
+                <div className="flex gap-2 pt-2">
+                  <a href={`https://github.com/${connection.username}`} target="_blank" rel="noreferrer">
+                    <SecondaryButton className="text-xs px-3 py-1.5">Open GitHub</SecondaryButton>
+                  </a>
+                  <SecondaryButton className="text-xs px-3 py-1.5" onClick={() => githubRepo.disconnectAccount(LIVE_STUDENT_ID)}>
+                    Disconnect
+                  </SecondaryButton>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-slate-400">Not connected. Connect from onboarding to submit Mini Tasks through GitHub.</p>
+            )}
+          </Card>
+
           <Card>
             <SectionTitle>Achievements</SectionTitle>
             {achievements.length === 0 ? (

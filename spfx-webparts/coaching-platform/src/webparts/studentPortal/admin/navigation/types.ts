@@ -11,6 +11,7 @@ export type AdminRoute =
   | { view: 'majorProject' }
   | { view: 'students' }
   | { view: 'batches' }
+  | { view: 'mentors' }
   | { view: 'enrollments' }
   | { view: 'evaluationQueue' }
   | { view: 'courseAnalytics' }
@@ -31,6 +32,7 @@ export type AdminTopLevelView =
   | 'majorProject'
   | 'students'
   | 'batches'
+  | 'mentors'
   | 'enrollments'
   | 'evaluationQueue'
   | 'courseAnalytics'

@@ -72,19 +72,28 @@ export function duplicateCourse(courseId: string, newTitle: string): CourseMeta 
     const newModuleId = remap(m.id);
     m.topics.forEach((t) => {
       const newTopicId = `${newModuleId}-t${t.id.split('-t')[1] || Math.random().toString(36).slice(2, 6)}`;
+      idMap[t.id] = newTopicId;
       const test = copy.topicTests.find((tt) => tt.id === t.testId);
       if (test) {
         test.id = `${newTopicId}-test`;
+        test.courseId = id;
+        test.moduleId = newModuleId;
         test.topicId = newTopicId;
       }
       t.testId = test ? test.id : t.testId;
       t.id = newTopicId;
+      t.courseId = id;
       t.moduleId = newModuleId;
+    });
+    m.practice.forEach((p) => {
+      p.courseId = id;
+      p.moduleId = newModuleId;
     });
     if (m.moduleTestId) {
       const mt = copy.moduleTests.find((tt) => tt.id === m.moduleTestId);
       if (mt) {
         mt.id = `${newModuleId}-moduletest`;
+        mt.courseId = id;
         mt.moduleId = newModuleId;
         m.moduleTestId = mt.id;
       }
@@ -93,6 +102,7 @@ export function duplicateCourse(courseId: string, newTitle: string): CourseMeta 
       const a = copy.assessments.find((aa) => aa.id === m.assessmentId);
       if (a) {
         a.id = `${newModuleId}-assessment`;
+        a.courseId = id;
         a.moduleId = newModuleId;
         m.assessmentId = a.id;
       }
@@ -101,15 +111,37 @@ export function duplicateCourse(courseId: string, newTitle: string): CourseMeta 
       const task = copy.miniTasks.find((tt) => tt.id === m.miniTaskId);
       if (task) {
         task.id = `${newModuleId}-task`;
+        task.courseId = id;
         task.moduleId = newModuleId;
         m.miniTaskId = task.id;
       }
     }
     if (m.prerequisiteModuleId) m.prerequisiteModuleId = idMap[m.prerequisiteModuleId] || m.prerequisiteModuleId;
     m.id = newModuleId;
+    m.courseId = id;
   });
-  copy.majorProject.moduleId = copy.majorProject.moduleId ? remap(copy.majorProject.moduleId) : copy.majorProject.moduleId;
+  copy.codingQuestions.forEach((q) => {
+    if (q.scope === 'course') q.courseId = id;
+    q.id = `${id}-${q.id}`;
+  });
+  copy.majorProject.id = `${id}-major-project`;
+  copy.majorProject.courseId = id;
+  copy.majorProject.moduleId = copy.majorProject.moduleId ? idMap[copy.majorProject.moduleId] || copy.majorProject.moduleId : copy.majorProject.moduleId;
   state.courses[id] = copy;
+
+  // Duplicate the source course's Question Bank entries too, remapped onto the
+  // new module/topic ids via the same idMap used for content above.
+  const bankCopies = state.questionBank
+    .filter((q) => q.courseId === courseId)
+    .map((q) => ({
+      ...q,
+      id: `${id}-${q.id}`,
+      courseId: id,
+      moduleId: q.moduleId ? idMap[q.moduleId] || q.moduleId : undefined,
+      topicId: q.topicId ? idMap[q.topicId] || q.topicId : undefined,
+    }));
+  state.questionBank.push(...bankCopies);
+
   commit();
   return copy.meta;
 }

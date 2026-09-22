@@ -1,15 +1,16 @@
 import * as React from 'react';
 import { useState } from 'react';
 import { PageHeader, PrimaryButton, SecondaryButton } from '../../ui/Primitives';
-import { AdminTable, AdminColumn, Drawer, FormField, TextInput, TextArea, Select, ConfirmDialog } from '../ui/AdminPrimitives';
+import { AdminTable, AdminColumn, Drawer, FormField, TextInput, TextArea, Select, Checkbox, ConfirmDialog } from '../ui/AdminPrimitives';
 import { PlusIcon, TrashIcon } from '../../ui/icons';
 import * as courseRepo from '../repository/courseRepository';
 import * as contentRepo from '../repository/contentRepository';
 import { MiniTaskDef, Difficulty } from '../../data/types';
 
-const emptyDraft = (moduleId: string): Omit<MiniTaskDef, 'id'> => ({
-  title: '', moduleId, difficulty: 'Beginner', estimatedDuration: '2 days', deadline: '', objective: '', requirements: [], skills: [], resources: [],
+const emptyDraft = (courseId: string, moduleId: string): Omit<MiniTaskDef, 'id'> => ({
+  courseId, title: '', moduleId, difficulty: 'Beginner', estimatedDuration: '2 days', deadline: '', objective: '', requirements: [], skills: [], resources: [],
   evaluationCriteriaTemplate: [{ label: 'Code Quality', maxScore: 20 }, { label: 'Functionality', maxScore: 30 }, { label: 'UI / UX', maxScore: 20 }, { label: 'Error Handling', maxScore: 15 }, { label: 'Documentation', maxScore: 15 }],
+  githubRequired: false, githubRepositoryMode: 'student-repo', githubBranch: '', githubPath: '', pullRequestRequired: false,
 });
 
 const MiniTasksAdminPage: React.FC = () => {
@@ -24,7 +25,7 @@ const MiniTasksAdminPage: React.FC = () => {
   const modules = content.moduleDefs;
   const tasks = content.miniTasks;
 
-  const openCreate = (): void => setDraft(emptyDraft(modules[0]?.id || ''));
+  const openCreate = (): void => setDraft(emptyDraft(courseId, modules[0]?.id || ''));
   const openEdit = (t: MiniTaskDef): void => {
     setEditing(t);
     setDraft({ ...t });
@@ -99,6 +100,9 @@ const MiniTasksAdminPage: React.FC = () => {
       >
         {draft && (
           <div className="space-y-4">
+            <FormField label="Course">
+              <TextInput value={courses.find((c) => c.id === draft.courseId)?.title || draft.courseId} disabled className="bg-slate-50 text-slate-500" />
+            </FormField>
             <FormField label="Task Name">
               <TextInput value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
             </FormField>
@@ -137,6 +141,35 @@ const MiniTasksAdminPage: React.FC = () => {
             </FormField>
             <FormField label="Resources" hint="One per line">
               <TextArea rows={2} value={draft.resources.join('\n')} onChange={(e) => setDraft({ ...draft, resources: e.target.value.split('\n').filter(Boolean) })} />
+            </FormField>
+            <FormField label="GitHub Submission">
+              <div className="space-y-3">
+                <Checkbox label="GitHub Required" checked={!!draft.githubRequired} onChange={(v) => setDraft({ ...draft, githubRequired: v })} />
+                {draft.githubRequired && (
+                  <>
+                    <Checkbox
+                      label="Require Pull Request"
+                      checked={!!draft.pullRequestRequired}
+                      onChange={(v) => setDraft({ ...draft, pullRequestRequired: v })}
+                    />
+                    <div className="grid grid-cols-2 gap-3">
+                      <TextInput
+                        value={draft.githubBranch || ''}
+                        onChange={(e) => setDraft({ ...draft, githubBranch: e.target.value })}
+                        placeholder="Branch, e.g. feature/react-todo"
+                      />
+                      <TextInput
+                        value={draft.githubPath || ''}
+                        onChange={(e) => setDraft({ ...draft, githubPath: e.target.value })}
+                        placeholder="Path, e.g. projects/react-todo"
+                      />
+                    </div>
+                    <p className="text-xs text-slate-400">
+                      Students with a connected training repository won&apos;t need to paste a URL — the repository is inferred automatically.
+                    </p>
+                  </>
+                )}
+              </div>
             </FormField>
             <FormField label={`Evaluation Criteria (total ${total})`}>
               <div className="space-y-2">

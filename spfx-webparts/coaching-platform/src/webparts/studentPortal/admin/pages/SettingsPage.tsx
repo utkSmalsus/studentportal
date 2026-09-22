@@ -5,7 +5,7 @@ import { AdminRole } from '../types';
 
 const roles: { role: AdminRole; description: string }[] = [
   { role: 'admin', description: 'Full access: courses, curriculum, question bank, students, batches, evaluation, reports, certificates, settings.' },
-  { role: 'instructor', description: 'Students, batches, evaluations, progress, and course content where permitted — no course publishing/archiving.' },
+  { role: 'mentor', description: 'Only their assigned batches/students — monitor progress, review Mini Tasks and Major Projects, view GitHub activity, evaluate submissions.' },
   { role: 'student', description: 'The student experience only.' },
 ];
 

@@ -2,13 +2,127 @@ import * as React from 'react';
 import { useState } from 'react';
 import { AdminRoute } from '../navigation/types';
 import { BackLink, Card, SectionTitle, PrimaryButton, SecondaryButton, StatusPill, EmptyState } from '../../ui/Primitives';
-import { FormField, FormSection, TextInput, TextArea, Select, Checkbox } from '../ui/AdminPrimitives';
+import { FormField, FormSection, TextInput, TextArea, Select, Checkbox, ConfirmDialog } from '../ui/AdminPrimitives';
+import { PlusIcon, TrashIcon } from '../../ui/icons';
 import * as courseRepo from '../repository/courseRepository';
-import { CourseMeta, TimelineType, ScheduleMode, LearningMode, ProgressionRules } from '../types';
+import * as curriculum from '../repository/curriculumRepository';
+import { CourseMeta, TimelineType, ScheduleMode, LearningMode, ProgressionRules, GithubRepositoryStrategy, GithubBranchStrategy } from '../types';
+import { ModuleDef, ModuleGroup } from '../../data/types';
 
-type Tab = 'basic' | 'timeline' | 'rules' | 'publish';
+type Tab = 'basic' | 'timeline' | 'rules' | 'curriculum' | 'github' | 'publish';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const GROUPS: ModuleGroup[] = ['Foundation', 'Programming', 'Frontend', 'Backend', 'Full Stack', 'Capstone'];
+
+// Section 7: a convenient module-management surface right inside Course Edit —
+// Curriculum Builder (admin/pages/CurriculumBuilderPage.tsx) remains available
+// for detailed topic/content editing; this is the quick overview + add/edit/
+// delete/reorder/publish-status list.
+const CurriculumTab: React.FC<{ courseId: string; onOpenBuilder: () => void }> = ({ courseId, onOpenBuilder }) => {
+  const content = courseRepo.getCourseContent(courseId);
+  const [creating, setCreating] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newGroup, setNewGroup] = useState<ModuleGroup>('Foundation');
+  const [newDuration, setNewDuration] = useState('1 week');
+  const [deleteTarget, setDeleteTarget] = useState<ModuleDef | undefined>();
+
+  if (!content) return null;
+  const modules = content.course.moduleOrder.map((id) => content.moduleDefs.find((m) => m.id === id)).filter((m): m is ModuleDef => !!m);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <SectionTitle className="mb-0">Modules ({modules.length})</SectionTitle>
+        <div className="flex items-center gap-2">
+          <SecondaryButton onClick={onOpenBuilder} className="text-xs px-3 py-1.5">
+            Open Curriculum Builder →
+          </SecondaryButton>
+          <PrimaryButton onClick={() => setCreating(true)} className="text-xs px-3 py-1.5">
+            <PlusIcon className="w-3.5 h-3.5" /> Add Module
+          </PrimaryButton>
+        </div>
+      </div>
+
+      {creating && (
+        <Card className="mb-4 !bg-indigo-50/40 !border-indigo-100">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+            <TextInput autoFocus value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Module title" />
+            <Select value={newGroup} onChange={(e) => setNewGroup(e.target.value as ModuleGroup)}>
+              {GROUPS.map((g) => (
+                <option key={g} value={g}>
+                  {g}
+                </option>
+              ))}
+            </Select>
+            <TextInput value={newDuration} onChange={(e) => setNewDuration(e.target.value)} placeholder="Estimated duration" />
+          </div>
+          <div className="flex items-center gap-2">
+            <PrimaryButton
+              className="text-xs px-3 py-1.5"
+              onClick={() => {
+                if (!newTitle.trim()) return;
+                curriculum.createModule(courseId, { title: newTitle, group: newGroup, estimatedDuration: newDuration });
+                setCreating(false);
+                setNewTitle('');
+              }}
+            >
+              Add
+            </PrimaryButton>
+            <SecondaryButton className="text-xs px-3 py-1.5" onClick={() => setCreating(false)}>
+              Cancel
+            </SecondaryButton>
+          </div>
+        </Card>
+      )}
+
+      {modules.length === 0 ? (
+        <EmptyState title="No modules yet" description="Add your first module, or use the Curriculum Builder for full topic/content editing." />
+      ) : (
+        <div className="space-y-2">
+          {modules.map((m, i) => (
+            <div key={m.id} className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl px-4 py-3">
+              <span className="text-xs font-bold text-slate-400 w-6 shrink-0">{i + 1}</span>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-slate-900">{m.title}</div>
+                <div className="text-xs text-slate-400 mt-0.5">
+                  {m.group} &middot; {m.estimatedDuration} &middot; {m.topics.length} topics
+                  {m.miniTaskId && ' · Mini Task'}
+                  {m.moduleTestId && ' · Module Test'}
+                  {m.assessmentId && ' · Assessment'}
+                </div>
+              </div>
+              <button disabled={i === 0} onClick={() => curriculum.reorderModule(courseId, m.id, 'up')} className="text-slate-300 hover:text-slate-600 disabled:opacity-30 shrink-0">
+                ↑
+              </button>
+              <button disabled={i === modules.length - 1} onClick={() => curriculum.reorderModule(courseId, m.id, 'down')} className="text-slate-300 hover:text-slate-600 disabled:opacity-30 shrink-0">
+                ↓
+              </button>
+              <button onClick={onOpenBuilder} className="text-xs font-semibold text-indigo-600 hover:underline shrink-0">
+                Edit
+              </button>
+              <button onClick={() => setDeleteTarget(m)} className="text-slate-300 hover:text-red-500 shrink-0">
+                <TrashIcon className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title={`Delete "${deleteTarget?.title}"?`}
+        description="This removes the module, its topics and tests permanently."
+        confirmLabel="Delete"
+        danger
+        onConfirm={() => {
+          if (deleteTarget) curriculum.deleteModule(courseId, deleteTarget.id);
+          setDeleteTarget(undefined);
+        }}
+        onCancel={() => setDeleteTarget(undefined)}
+      />
+    </div>
+  );
+};
 
 const PublishPanel: React.FC<{ courseId: string; onPreviewAsStudent: (courseId: string) => void }> = ({ courseId, onPreviewAsStudent }) => {
   const [issues, setIssues] = useState(() => courseRepo.validateCourse(courseId));
@@ -64,6 +178,7 @@ const CourseEditPage: React.FC<{ courseId: string; onNavigate: (r: AdminRoute) =
   const update = (patch: Partial<CourseMeta>): void => courseRepo.updateCourseMeta(courseId, patch);
   const updateTimeline = (patch: Partial<CourseMeta['timeline']>): void => update({ timeline: { ...meta.timeline, ...patch } });
   const updateRules = (patch: Partial<ProgressionRules>): void => update({ defaultProgressionRules: { ...meta.defaultProgressionRules, ...patch } });
+  const updateGithub = (patch: Partial<CourseMeta['githubSettings']>): void => update({ githubSettings: { ...meta.githubSettings, ...patch } });
 
   const toggleDay = (day: string): void => {
     const days = meta.timeline.classDays.indexOf(day) !== -1 ? meta.timeline.classDays.filter((d) => d !== day) : [...meta.timeline.classDays, day];
@@ -72,8 +187,10 @@ const CourseEditPage: React.FC<{ courseId: string; onNavigate: (r: AdminRoute) =
 
   const tabs: { key: Tab; label: string }[] = [
     { key: 'basic', label: 'Basic Information' },
+    { key: 'curriculum', label: 'Curriculum' },
     { key: 'timeline', label: 'Timeline' },
     { key: 'rules', label: 'Progression Rules' },
+    { key: 'github', label: 'GitHub' },
     { key: 'publish', label: 'Publish' },
   ];
 
@@ -238,6 +355,47 @@ const CourseEditPage: React.FC<{ courseId: string; onNavigate: (r: AdminRoute) =
               <TextInput type="number" value={meta.defaultProgressionRules.assessmentPassingScore} onChange={(e) => updateRules({ assessmentPassingScore: Number(e.target.value) })} />
             </FormField>
           </div>
+        </Card>
+      )}
+
+      {tab === 'curriculum' && <CurriculumTab courseId={courseId} onOpenBuilder={() => onNavigate({ view: 'curriculum', courseId })} />}
+
+      {tab === 'github' && (
+        <Card className="max-w-2xl">
+          <SectionTitle>GitHub Integration</SectionTitle>
+          <p className="text-xs text-slate-400 mb-4">
+            A theory-only course can turn this off entirely; development courses default to on and required.
+          </p>
+          <div className="space-y-3 mb-6">
+            <Checkbox label="Enable GitHub Integration" checked={meta.githubSettings.enabled} onChange={(v) => updateGithub({ enabled: v })} />
+            {meta.githubSettings.enabled && (
+              <>
+                <Checkbox label="Require GitHub During Onboarding" checked={meta.githubSettings.requiredForOnboarding} onChange={(v) => updateGithub({ requiredForOnboarding: v })} />
+                <Checkbox label="Require Training Repository" checked={meta.githubSettings.trainingRepositoryRequired} onChange={(v) => updateGithub({ trainingRepositoryRequired: v })} />
+                <Checkbox label="Require Pull Request" checked={meta.githubSettings.pullRequestRequired} onChange={(v) => updateGithub({ pullRequestRequired: v })} />
+              </>
+            )}
+          </div>
+          {meta.githubSettings.enabled && (
+            <div className="grid grid-cols-2 gap-4">
+              <FormField label="Repository Strategy">
+                <Select value={meta.githubSettings.repositoryStrategy} onChange={(e) => updateGithub({ repositoryStrategy: e.target.value as GithubRepositoryStrategy })}>
+                  <option value="single">One Training Repository</option>
+                  <option value="major-project">Repository Per Major Project</option>
+                </Select>
+              </FormField>
+              <FormField label="Branch Strategy">
+                <Select value={meta.githubSettings.branchStrategy} onChange={(e) => updateGithub({ branchStrategy: e.target.value as GithubBranchStrategy })}>
+                  <option value="main">Main</option>
+                  <option value="feature">Feature Branch</option>
+                  <option value="feature-pr">Feature Branch + Pull Request</option>
+                </Select>
+              </FormField>
+              <FormField label="Default Branch">
+                <TextInput value={meta.githubSettings.defaultBranch} onChange={(e) => updateGithub({ defaultBranch: e.target.value })} />
+              </FormField>
+            </div>
+          )}
         </Card>
       )}
 

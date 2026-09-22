@@ -13,6 +13,7 @@ import AssessmentsAdminPage from './pages/AssessmentsAdminPage';
 import MajorProjectAdminPage from './pages/MajorProjectAdminPage';
 import StudentsPage from './pages/StudentsPage';
 import BatchesPage from './pages/BatchesPage';
+import MentorsAdminPage from './pages/MentorsAdminPage';
 import EnrollmentsPage from './pages/EnrollmentsPage';
 import EvaluationQueuePage from './pages/EvaluationQueuePage';
 import ReportsPage from './pages/ReportsPage';
@@ -21,7 +22,12 @@ import NotificationsAdminPage from './pages/NotificationsAdminPage';
 import SettingsPage from './pages/SettingsPage';
 import { useAdminStoreVersion } from './hooks';
 
-const AdminApp: React.FC<{ userDisplayName: string; onExitAdmin: () => void; onPreviewAsStudent: (courseId: string) => void }> = ({ userDisplayName, onExitAdmin, onPreviewAsStudent }) => {
+const AdminApp: React.FC<{ userDisplayName: string; onExitAdmin: () => void; onPreviewAsStudent: (courseId: string) => void; onOpenMentorPortal: () => void }> = ({
+  userDisplayName,
+  onExitAdmin,
+  onPreviewAsStudent,
+  onOpenMentorPortal,
+}) => {
   useAdminStoreVersion();
   const [route, setRoute] = useState<AdminRoute>({ view: 'dashboard' });
 
@@ -51,6 +57,8 @@ const AdminApp: React.FC<{ userDisplayName: string; onExitAdmin: () => void; onP
         return <StudentsPage />;
       case 'batches':
         return <BatchesPage />;
+      case 'mentors':
+        return <MentorsAdminPage />;
       case 'enrollments':
         return <EnrollmentsPage />;
       case 'evaluationQueue':
@@ -71,7 +79,7 @@ const AdminApp: React.FC<{ userDisplayName: string; onExitAdmin: () => void; onP
   };
 
   return (
-    <AdminLayout route={route} onNavigate={setRoute} userDisplayName={userDisplayName} onExitAdmin={onExitAdmin}>
+    <AdminLayout route={route} onNavigate={setRoute} userDisplayName={userDisplayName} onExitAdmin={onExitAdmin} onOpenMentorPortal={onOpenMentorPortal}>
       {renderPage()}
     </AdminLayout>
   );

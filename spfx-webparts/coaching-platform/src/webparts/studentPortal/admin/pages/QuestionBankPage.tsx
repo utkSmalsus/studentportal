@@ -126,13 +126,33 @@ const QuestionBankPage: React.FC = () => {
             <FormField label="Explanation">
               <TextArea rows={2} value={draft.explanation || ''} onChange={(e) => setDraft({ ...draft, explanation: e.target.value })} />
             </FormField>
-            <div className="grid grid-cols-2 gap-4">
+            <FormField label="Course" hint="Course is fixed to the course selected above — a question can never point at another course's module or topic.">
+              <TextInput value={courses.find((c) => c.id === draft.courseId)?.title || draft.courseId} disabled className="bg-slate-50 text-slate-500" />
+            </FormField>
+            <div className="grid grid-cols-3 gap-4">
               <FormField label="Module">
-                <Select value={draft.moduleId || ''} onChange={(e) => setDraft({ ...draft, moduleId: e.target.value || undefined })}>
+                <Select
+                  value={draft.moduleId || ''}
+                  onChange={(e) => setDraft({ ...draft, moduleId: e.target.value || undefined, topicId: undefined })}
+                >
                   <option value="">—</option>
                   {modules.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.title}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+              <FormField label="Topic">
+                <Select
+                  value={draft.topicId || ''}
+                  onChange={(e) => setDraft({ ...draft, topicId: e.target.value || undefined })}
+                  disabled={!draft.moduleId}
+                >
+                  <option value="">—</option>
+                  {(modules.find((m) => m.id === draft.moduleId)?.topics || []).map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.title}
                     </option>
                   ))}
                 </Select>

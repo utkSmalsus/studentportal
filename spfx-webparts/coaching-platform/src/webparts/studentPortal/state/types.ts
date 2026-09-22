@@ -55,6 +55,15 @@ export interface MiniTaskEvaluation {
 export interface MiniTaskSubmissionVersion {
   version: number;
   githubUrl: string;
+  // Structured GitHub evidence captured alongside the URL — repository/branch/
+  // commit is what the mentor actually reviews. See admin/types.ts GitHubConnection
+  // /GitHubRepositoryLink for the connection this is drawn from. A GitHub commit
+  // existing here is evidence of activity, never a completion signal by itself —
+  // only a mentor's evaluation (below) decides pass/fail.
+  githubRepositoryName?: string;
+  githubBranch?: string;
+  githubCommitSha?: string;
+  githubPullRequestUrl?: string;
   liveUrl: string;
   notes: string;
   submittedAt: string;

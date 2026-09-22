@@ -41,10 +41,12 @@ export const profile: StudentProfile = {
 // this generator so every topic in the course has a complete, working page rather
 // than leaving 25+ topics blank. This is exactly the shape an admin-authored topic
 // would have — some topics get more editorial attention than others, same schema.
-function defaultTopicTest(topicId: string, title: string): TopicTestDef {
+function defaultTopicTest(courseId: string, moduleId: string, topicId: string, title: string): TopicTestDef {
   const testId = `${topicId}-test`;
   return {
     id: testId,
+    courseId,
+    moduleId,
     topicId,
     passingScorePercent: 70,
     questions: [
@@ -92,6 +94,7 @@ function defaultTopicContent(title: string, group: string): TopicDef['content'] 
 
 const topicTests: TopicTestDef[] = [];
 function topic(
+  courseId: string,
   moduleId: string,
   moduleGroup: string,
   index: number,
@@ -100,10 +103,11 @@ function topic(
   opts?: { youtubeVideoId?: string; content?: TopicDef['content'] }
 ): TopicDef {
   const id = `${moduleId}-t${index}`;
-  const test = defaultTopicTest(id, title);
+  const test = defaultTopicTest(courseId, moduleId, id, title);
   topicTests.push(test);
   return {
     id,
+    courseId,
     moduleId,
     title,
     estimatedMinutes,
@@ -115,10 +119,10 @@ function topic(
 
 export const moduleDefs: ModuleDef[] = [
   {
-    id: 'html', title: 'HTML', group: 'Foundation', estimatedDuration: '1 week',
+    courseId: 'mern', id: 'html', title: 'HTML', group: 'Foundation', estimatedDuration: '1 week',
     whatYoullLearn: ['Semantic HTML', 'Forms', 'Tables', 'Accessibility basics'],
     topics: [
-      topic('html', 'Foundation', 1, 'Document Structure & Semantics', 30, {
+      topic('mern', 'html', 'Foundation', 1, 'Document Structure & Semantics', 30, {
         youtubeVideoId: 'qz0aGYrrlhU',
         content: {
           whatYoullLearn: ['The HTML document skeleton', 'Semantic tags: header, main, section, article, footer', 'Why semantics matter for accessibility and SEO'],
@@ -128,7 +132,7 @@ export const moduleDefs: ModuleDef[] = [
           resources: ['MDN: HTML elements reference', 'web.dev: Learn HTML'],
         },
       }),
-      topic('html', 'Foundation', 2, 'Forms & Inputs', 30, {
+      topic('mern', 'html', 'Foundation', 2, 'Forms & Inputs', 30, {
         content: {
           whatYoullLearn: ['Form elements and input types', 'Labels and accessibility', 'Client-side validation attributes'],
           keyConcepts: ['<form>', '<input type="...">', 'required / pattern / min / max'],
@@ -139,16 +143,16 @@ export const moduleDefs: ModuleDef[] = [
       }),
     ],
     practice: [
-      { id: 'html-p1', title: 'Build a semantic article page', description: 'Structure a blog post using header, article, section and footer.', estimatedMinutes: 40 },
-      { id: 'html-p2', title: 'Build a registration form', description: 'A form with validated inputs and labels.', estimatedMinutes: 40 },
+      { id: 'html-p1', courseId: 'mern', moduleId: 'html', title: 'Build a semantic article page', description: 'Structure a blog post using header, article, section and footer.', estimatedMinutes: 40 },
+      { id: 'html-p2', courseId: 'mern', moduleId: 'html', title: 'Build a registration form', description: 'A form with validated inputs and labels.', estimatedMinutes: 40 },
     ],
     miniTaskId: 'task-html',
   },
   {
-    id: 'css', title: 'CSS', group: 'Foundation', estimatedDuration: '1 week',
+    courseId: 'mern', id: 'css', title: 'CSS', group: 'Foundation', estimatedDuration: '1 week',
     whatYoullLearn: ['Box model', 'Flexbox', 'Grid', 'Responsive design'],
     topics: [
-      topic('css', 'Foundation', 1, 'Box Model & Selectors', 30, {
+      topic('mern', 'css', 'Foundation', 1, 'Box Model & Selectors', 30, {
         youtubeVideoId: 'ESnrn1kAD4E',
         content: {
           whatYoullLearn: ['Content, padding, border, margin', 'Selector specificity', 'box-sizing: border-box'],
@@ -158,7 +162,7 @@ export const moduleDefs: ModuleDef[] = [
           resources: ['MDN: The box model'],
         },
       }),
-      topic('css', 'Foundation', 2, 'Flexbox & Grid', 40, {
+      topic('mern', 'css', 'Foundation', 2, 'Flexbox & Grid', 40, {
         content: {
           whatYoullLearn: ['1D layout with Flexbox', '2D layout with Grid', 'When to use which'],
           keyConcepts: ['display: flex', 'justify-content / align-items', 'display: grid, grid-template-columns'],
@@ -168,17 +172,17 @@ export const moduleDefs: ModuleDef[] = [
         },
       }),
     ],
-    practice: [{ id: 'css-p1', title: 'Build a responsive nav bar', description: 'A nav bar that collapses on mobile.', estimatedMinutes: 35 }],
+    practice: [{ id: 'css-p1', courseId: 'mern', moduleId: 'css', title: 'Build a responsive nav bar', description: 'A nav bar that collapses on mobile.', estimatedMinutes: 35 }],
     miniTaskId: 'task-css',
     assessmentId: 'assess-html-css',
     moduleTestId: 'test-css',
     prerequisiteModuleId: 'html',
   },
   {
-    id: 'js-basics', title: 'JavaScript Basics', group: 'Programming', estimatedDuration: '2 weeks',
+    courseId: 'mern', id: 'js-basics', title: 'JavaScript Basics', group: 'Programming', estimatedDuration: '2 weeks',
     whatYoullLearn: ['Variables & data types', 'Operators & conditions', 'Loops', 'Functions'],
     topics: [
-      topic('js-basics', 'Programming', 1, 'Variables, Types & Operators', 35, {
+      topic('mern', 'js-basics', 'Programming', 1, 'Variables, Types & Operators', 35, {
         youtubeVideoId: 'hdI2bqOjy3c',
         content: {
           whatYoullLearn: ['let / const / var', 'Primitive types', 'Arithmetic & comparison operators'],
@@ -188,8 +192,8 @@ export const moduleDefs: ModuleDef[] = [
           resources: ['MDN: JavaScript data types', 'MDN: Operators'],
         },
       }),
-      topic('js-basics', 'Programming', 2, 'Conditions & Loops', 35),
-      topic('js-basics', 'Programming', 3, 'Functions', 30, {
+      topic('mern', 'js-basics', 'Programming', 2, 'Conditions & Loops', 35),
+      topic('mern', 'js-basics', 'Programming', 3, 'Functions', 30, {
         content: {
           whatYoullLearn: ['Function declarations vs expressions', 'Arrow functions', 'Parameters, defaults and return values'],
           keyConcepts: ['function foo() {}', 'const foo = () => {}', 'Default parameters'],
@@ -200,25 +204,25 @@ export const moduleDefs: ModuleDef[] = [
       }),
     ],
     practice: [
-      { id: 'jsb-p1', title: 'FizzBuzz & loop drills', description: 'Classic loop and condition warm-ups.', estimatedMinutes: 30 },
-      { id: 'jsb-p2', title: 'Function exercises', description: 'Write small reusable functions.', estimatedMinutes: 30 },
+      { id: 'jsb-p1', courseId: 'mern', moduleId: 'js-basics', title: 'FizzBuzz & loop drills', description: 'Classic loop and condition warm-ups.', estimatedMinutes: 30 },
+      { id: 'jsb-p2', courseId: 'mern', moduleId: 'js-basics', title: 'Function exercises', description: 'Write small reusable functions.', estimatedMinutes: 30 },
     ],
     assessmentId: 'assess-js-basics',
     moduleTestId: 'test-js-basics',
     prerequisiteModuleId: 'css',
   },
   {
-    id: 'js-intermediate', title: 'JavaScript Intermediate', group: 'Programming', estimatedDuration: '2 weeks',
+    courseId: 'mern', id: 'js-intermediate', title: 'JavaScript Intermediate', group: 'Programming', estimatedDuration: '2 weeks',
     whatYoullLearn: ['Array methods', 'Object manipulation', 'Destructuring', 'Spread / rest', 'Higher-order functions'],
     topics: [
-      topic('js-intermediate', 'Programming', 1, 'Array Methods (map, filter, reduce)', 40),
-      topic('js-intermediate', 'Programming', 2, 'Objects, Destructuring & Spread', 35),
-      topic('js-intermediate', 'Programming', 3, 'Higher-Order Functions', 30),
+      topic('mern', 'js-intermediate', 'Programming', 1, 'Array Methods (map, filter, reduce)', 40),
+      topic('mern', 'js-intermediate', 'Programming', 2, 'Objects, Destructuring & Spread', 35),
+      topic('mern', 'js-intermediate', 'Programming', 3, 'Higher-Order Functions', 30),
     ],
     practice: [
-      { id: 'jsi-p1', title: 'Array method drills', description: 'map/filter/reduce practice set.', estimatedMinutes: 35 },
-      { id: 'jsi-p2', title: 'Object transformation exercises', description: 'Reshape and merge objects.', estimatedMinutes: 30 },
-      { id: 'jsi-p3', title: 'Build a small utility library', description: 'chunk, unique, groupBy, flatten.', estimatedMinutes: 45 },
+      { id: 'jsi-p1', courseId: 'mern', moduleId: 'js-intermediate', title: 'Array method drills', description: 'map/filter/reduce practice set.', estimatedMinutes: 35 },
+      { id: 'jsi-p2', courseId: 'mern', moduleId: 'js-intermediate', title: 'Object transformation exercises', description: 'Reshape and merge objects.', estimatedMinutes: 30 },
+      { id: 'jsi-p3', courseId: 'mern', moduleId: 'js-intermediate', title: 'Build a small utility library', description: 'chunk, unique, groupBy, flatten.', estimatedMinutes: 45 },
     ],
     miniTaskId: 'task-js-utils',
     assessmentId: 'assess-js-intermediate',
@@ -226,42 +230,42 @@ export const moduleDefs: ModuleDef[] = [
     prerequisiteModuleId: 'js-basics',
   },
   {
-    id: 'js-advanced', title: 'JavaScript Advanced', group: 'Programming', estimatedDuration: '2 weeks',
+    courseId: 'mern', id: 'js-advanced', title: 'JavaScript Advanced', group: 'Programming', estimatedDuration: '2 weeks',
     whatYoullLearn: ['Closures', 'The event loop', 'Promises & async/await', 'Debouncing & throttling'],
     topics: [
-      topic('js-advanced', 'Programming', 1, 'Closures & Scope', 35),
-      topic('js-advanced', 'Programming', 2, 'The Event Loop', 35),
-      topic('js-advanced', 'Programming', 3, 'Promises & Async/Await', 40),
+      topic('mern', 'js-advanced', 'Programming', 1, 'Closures & Scope', 35),
+      topic('mern', 'js-advanced', 'Programming', 2, 'The Event Loop', 35),
+      topic('mern', 'js-advanced', 'Programming', 3, 'Promises & Async/Await', 40),
     ],
-    practice: [{ id: 'jsa-p1', title: 'Closure & async drills', description: 'Write closures and async helpers.', estimatedMinutes: 40 }],
+    practice: [{ id: 'jsa-p1', courseId: 'mern', moduleId: 'js-advanced', title: 'Closure & async drills', description: 'Write closures and async helpers.', estimatedMinutes: 40 }],
     assessmentId: 'assess-js-advanced',
     moduleTestId: 'test-js-advanced',
     prerequisiteModuleId: 'js-intermediate',
   },
   {
-    id: 'react', title: 'React', group: 'Frontend', estimatedDuration: '2 weeks',
+    courseId: 'mern', id: 'react', title: 'React', group: 'Frontend', estimatedDuration: '2 weeks',
     whatYoullLearn: ['Components & props', 'State', 'Rendering & the virtual DOM'],
     topics: [
-      topic('react', 'Frontend', 1, 'Components & Props', 35),
-      topic('react', 'Frontend', 2, 'State & Events', 35),
+      topic('mern', 'react', 'Frontend', 1, 'Components & Props', 35),
+      topic('mern', 'react', 'Frontend', 2, 'State & Events', 35),
     ],
-    practice: [{ id: 'react-p1', title: 'Build a component library', description: 'Small prop-driven UI components.', estimatedMinutes: 45 }],
+    practice: [{ id: 'react-p1', courseId: 'mern', moduleId: 'react', title: 'Build a component library', description: 'Small prop-driven UI components.', estimatedMinutes: 45 }],
     miniTaskId: 'task-react-components',
     assessmentId: 'assess-react',
     moduleTestId: 'test-react',
     prerequisiteModuleId: 'js-advanced',
   },
   {
-    id: 'react-hooks', title: 'React Hooks', group: 'Frontend', estimatedDuration: '2 weeks',
+    courseId: 'mern', id: 'react-hooks', title: 'React Hooks', group: 'Frontend', estimatedDuration: '2 weeks',
     whatYoullLearn: ['useState & useEffect', 'Custom hooks', 'Forms with hooks', 'Data fetching'],
     topics: [
-      topic('react-hooks', 'Frontend', 1, 'useState & useEffect', 35),
-      topic('react-hooks', 'Frontend', 2, 'Custom Hooks', 35),
-      topic('react-hooks', 'Frontend', 3, 'Data Fetching Patterns', 40),
+      topic('mern', 'react-hooks', 'Frontend', 1, 'useState & useEffect', 35),
+      topic('mern', 'react-hooks', 'Frontend', 2, 'Custom Hooks', 35),
+      topic('mern', 'react-hooks', 'Frontend', 3, 'Data Fetching Patterns', 40),
     ],
     practice: [
-      { id: 'rh-p1', title: 'Build a useLocalStorage hook', description: 'Persist state to localStorage.', estimatedMinutes: 35 },
-      { id: 'rh-p2', title: 'Build a useFetch hook', description: 'Reusable data-fetching hook.', estimatedMinutes: 40 },
+      { id: 'rh-p1', courseId: 'mern', moduleId: 'react-hooks', title: 'Build a useLocalStorage hook', description: 'Persist state to localStorage.', estimatedMinutes: 35 },
+      { id: 'rh-p2', courseId: 'mern', moduleId: 'react-hooks', title: 'Build a useFetch hook', description: 'Reusable data-fetching hook.', estimatedMinutes: 40 },
     ],
     miniTaskId: 'task-react-todo',
     assessmentId: 'assess-react-hooks',
@@ -269,24 +273,24 @@ export const moduleDefs: ModuleDef[] = [
     prerequisiteModuleId: 'react',
   },
   {
-    id: 'state-management', title: 'State Management', group: 'Frontend', estimatedDuration: '1 week',
+    courseId: 'mern', id: 'state-management', title: 'State Management', group: 'Frontend', estimatedDuration: '1 week',
     whatYoullLearn: ['Context API', 'Lifting state up', 'Intro to external state libraries'],
-    topics: [topic('state-management', 'Frontend', 1, 'Context API', 30)],
-    practice: [{ id: 'sm-p1', title: 'Global theme/auth context', description: 'Share state across the app with Context.', estimatedMinutes: 35 }],
+    topics: [topic('mern', 'state-management', 'Frontend', 1, 'Context API', 30)],
+    practice: [{ id: 'sm-p1', courseId: 'mern', moduleId: 'state-management', title: 'Global theme/auth context', description: 'Share state across the app with Context.', estimatedMinutes: 35 }],
     prerequisiteModuleId: 'react-hooks',
   },
   {
-    id: 'react-projects', title: 'React Projects', group: 'Frontend', estimatedDuration: '2 weeks',
+    courseId: 'mern', id: 'react-projects', title: 'React Projects', group: 'Frontend', estimatedDuration: '2 weeks',
     whatYoullLearn: ['Combining hooks, context and routing into a real app'],
-    topics: [topic('react-projects', 'Frontend', 1, 'Routing with React Router', 35)],
-    practice: [{ id: 'rp-p1', title: 'Multi-page project', description: 'A small multi-route React app.', estimatedMinutes: 60 }],
+    topics: [topic('mern', 'react-projects', 'Frontend', 1, 'Routing with React Router', 35)],
+    practice: [{ id: 'rp-p1', courseId: 'mern', moduleId: 'react-projects', title: 'Multi-page project', description: 'A small multi-route React app.', estimatedMinutes: 60 }],
     prerequisiteModuleId: 'state-management',
   },
   {
-    id: 'node', title: 'Node.js', group: 'Backend', estimatedDuration: '2 weeks',
+    courseId: 'mern', id: 'node', title: 'Node.js', group: 'Backend', estimatedDuration: '2 weeks',
     whatYoullLearn: ['Node runtime & modules', 'npm', 'File system & streams'],
     topics: [
-      topic('node', 'Backend', 1, 'Node Fundamentals', 30, {
+      topic('mern', 'node', 'Backend', 1, 'Node Fundamentals', 30, {
         content: {
           whatYoullLearn: ['What the Node runtime is and how it differs from the browser', 'The global object and process', 'Running a script with `node file.js`'],
           keyConcepts: ['V8 engine', 'process.argv / process.env', 'Event-driven, non-blocking I/O'],
@@ -295,7 +299,7 @@ export const moduleDefs: ModuleDef[] = [
           resources: ['Node.js docs: Introduction'],
         },
       }),
-      topic('node', 'Backend', 2, 'Modules & npm', 30, {
+      topic('mern', 'node', 'Backend', 2, 'Modules & npm', 30, {
         content: {
           whatYoullLearn: ['CommonJS require/module.exports', 'package.json and dependencies', 'Installing and using an npm package'],
           keyConcepts: ['require()', 'module.exports', 'npm install'],
@@ -304,7 +308,7 @@ export const moduleDefs: ModuleDef[] = [
           resources: ['Node.js docs: Modules', 'npm docs: package.json'],
         },
       }),
-      topic('node', 'Backend', 3, 'File System & Streams', 35, {
+      topic('mern', 'node', 'Backend', 3, 'File System & Streams', 35, {
         youtubeVideoId: 'YazJFb_i4A0',
         content: {
           whatYoullLearn: ['Reading and writing files with the fs module', 'Sync vs async fs methods', 'Why streams matter for large files'],
@@ -316,8 +320,8 @@ export const moduleDefs: ModuleDef[] = [
       }),
     ],
     practice: [
-      { id: 'node-p1', title: 'Build a CLI tool', description: 'Read and transform a local file from the command line.', estimatedMinutes: 45 },
-      { id: 'node-p2', title: 'Read & write JSON files', description: 'Persist small CLI state to disk.', estimatedMinutes: 30 },
+      { id: 'node-p1', courseId: 'mern', moduleId: 'node', title: 'Build a CLI tool', description: 'Read and transform a local file from the command line.', estimatedMinutes: 45 },
+      { id: 'node-p2', courseId: 'mern', moduleId: 'node', title: 'Read & write JSON files', description: 'Persist small CLI state to disk.', estimatedMinutes: 30 },
     ],
     miniTaskId: 'task-node-cli',
     assessmentId: 'assess-node',
@@ -325,44 +329,44 @@ export const moduleDefs: ModuleDef[] = [
     prerequisiteModuleId: 'react-projects',
   },
   {
-    id: 'express', title: 'Express.js', group: 'Backend', estimatedDuration: '2 weeks',
+    courseId: 'mern', id: 'express', title: 'Express.js', group: 'Backend', estimatedDuration: '2 weeks',
     whatYoullLearn: ['Routing', 'Middleware', 'Error handling'],
-    topics: [topic('express', 'Backend', 1, 'Routing & Middleware', 35)],
-    practice: [{ id: 'exp-p1', title: 'Build a small REST server', description: 'CRUD routes with Express.', estimatedMinutes: 45 }],
+    topics: [topic('mern', 'express', 'Backend', 1, 'Routing & Middleware', 35)],
+    practice: [{ id: 'exp-p1', courseId: 'mern', moduleId: 'express', title: 'Build a small REST server', description: 'CRUD routes with Express.', estimatedMinutes: 45 }],
     miniTaskId: 'task-express-api',
     prerequisiteModuleId: 'node',
   },
   {
-    id: 'mongodb', title: 'MongoDB', group: 'Backend', estimatedDuration: '1 week',
+    courseId: 'mern', id: 'mongodb', title: 'MongoDB', group: 'Backend', estimatedDuration: '1 week',
     whatYoullLearn: ['Documents & collections', 'CRUD', 'Mongoose schemas'],
-    topics: [topic('mongodb', 'Backend', 1, 'Documents, Collections & CRUD', 35)],
-    practice: [{ id: 'mongo-p1', title: 'Model a small app schema', description: 'Design a Mongoose schema.', estimatedMinutes: 35 }],
+    topics: [topic('mern', 'mongodb', 'Backend', 1, 'Documents, Collections & CRUD', 35)],
+    practice: [{ id: 'mongo-p1', courseId: 'mern', moduleId: 'mongodb', title: 'Model a small app schema', description: 'Design a Mongoose schema.', estimatedMinutes: 35 }],
     miniTaskId: 'task-mongo-schema',
     prerequisiteModuleId: 'express',
   },
   {
-    id: 'rest-apis', title: 'REST APIs', group: 'Full Stack', estimatedDuration: '1 week',
+    courseId: 'mern', id: 'rest-apis', title: 'REST APIs', group: 'Full Stack', estimatedDuration: '1 week',
     whatYoullLearn: ['API design', 'Status codes', 'Connecting frontend to backend'],
-    topics: [topic('rest-apis', 'Full Stack', 1, 'API Design Principles', 30)],
-    practice: [{ id: 'rest-p1', title: 'Connect React app to Express API', description: 'Wire the frontend to real endpoints.', estimatedMinutes: 45 }],
+    topics: [topic('mern', 'rest-apis', 'Full Stack', 1, 'API Design Principles', 30)],
+    practice: [{ id: 'rest-p1', courseId: 'mern', moduleId: 'rest-apis', title: 'Connect React app to Express API', description: 'Wire the frontend to real endpoints.', estimatedMinutes: 45 }],
     prerequisiteModuleId: 'mongodb',
   },
   {
-    id: 'authentication', title: 'Authentication', group: 'Full Stack', estimatedDuration: '1 week',
+    courseId: 'mern', id: 'authentication', title: 'Authentication', group: 'Full Stack', estimatedDuration: '1 week',
     whatYoullLearn: ['JWT', 'Sessions', 'Protecting routes'],
-    topics: [topic('authentication', 'Full Stack', 1, 'JWT & Sessions', 35)],
-    practice: [{ id: 'auth-p1', title: 'Add login/signup to your app', description: 'Protect routes with JWT.', estimatedMinutes: 45 }],
+    topics: [topic('mern', 'authentication', 'Full Stack', 1, 'JWT & Sessions', 35)],
+    practice: [{ id: 'auth-p1', courseId: 'mern', moduleId: 'authentication', title: 'Add login/signup to your app', description: 'Protect routes with JWT.', estimatedMinutes: 45 }],
     prerequisiteModuleId: 'rest-apis',
   },
   {
-    id: 'deployment', title: 'Deployment', group: 'Full Stack', estimatedDuration: '1 week',
+    courseId: 'mern', id: 'deployment', title: 'Deployment', group: 'Full Stack', estimatedDuration: '1 week',
     whatYoullLearn: ['Environment configs', 'Hosting frontend & backend', 'CI basics'],
-    topics: [topic('deployment', 'Full Stack', 1, 'Hosting & Environment Configs', 30)],
-    practice: [{ id: 'dep-p1', title: 'Deploy a full stack app', description: 'Ship frontend and backend live.', estimatedMinutes: 45 }],
+    topics: [topic('mern', 'deployment', 'Full Stack', 1, 'Hosting & Environment Configs', 30)],
+    practice: [{ id: 'dep-p1', courseId: 'mern', moduleId: 'deployment', title: 'Deploy a full stack app', description: 'Ship frontend and backend live.', estimatedMinutes: 45 }],
     prerequisiteModuleId: 'authentication',
   },
   {
-    id: 'major-project', title: 'Major Project', group: 'Capstone', estimatedDuration: '3 weeks',
+    courseId: 'mern', id: 'major-project', title: 'Major Project', group: 'Capstone', estimatedDuration: '3 weeks',
     whatYoullLearn: ['Bringing your frontend and backend skills together into one real application'],
     topics: [], practice: [],
     // Unlocks once Frontend is complete, not after the whole course — the capstone
@@ -379,7 +383,7 @@ export { topicTests };
 
 export const moduleTests: ModuleTestDef[] = [
   {
-    id: 'test-css', moduleId: 'css', title: 'HTML & CSS Module Test', timeLimitMinutes: 15, passingScorePercent: 70, attemptsAllowed: 2,
+    courseId: 'mern', id: 'test-css', moduleId: 'css', title: 'HTML & CSS Module Test', timeLimitMinutes: 15, passingScorePercent: 70, attemptsAllowed: 2,
     questions: [
       { id: 'tcss1', text: 'Which value of box-sizing makes width include padding and border?', options: ['border-box', 'content-box', 'padding-box', 'inherit'], correctIndex: 0 },
       { id: 'tcss2', text: 'Which property distributes space between flex items?', options: ['justify-content', 'align-items', 'flex-direction', 'gap'], correctIndex: 0 },
@@ -389,7 +393,7 @@ export const moduleTests: ModuleTestDef[] = [
     ],
   },
   {
-    id: 'test-js-basics', moduleId: 'js-basics', title: 'JavaScript Basics Module Test', timeLimitMinutes: 15, passingScorePercent: 70, attemptsAllowed: 2,
+    courseId: 'mern', id: 'test-js-basics', moduleId: 'js-basics', title: 'JavaScript Basics Module Test', timeLimitMinutes: 15, passingScorePercent: 70, attemptsAllowed: 2,
     questions: [
       { id: 'tjb1', text: 'Which keyword should you default to when declaring a variable that will not be reassigned?', options: ['const', 'var', 'let', 'static'], correctIndex: 0 },
       { id: 'tjb2', text: 'What does `typeof "hello"` return?', options: ['"string"', '"text"', '"char"', '"object"'], correctIndex: 0 },
@@ -399,7 +403,7 @@ export const moduleTests: ModuleTestDef[] = [
     ],
   },
   {
-    id: 'test-js-intermediate', moduleId: 'js-intermediate', title: 'JavaScript Intermediate Module Test', timeLimitMinutes: 18, passingScorePercent: 70, attemptsAllowed: 2,
+    courseId: 'mern', id: 'test-js-intermediate', moduleId: 'js-intermediate', title: 'JavaScript Intermediate Module Test', timeLimitMinutes: 18, passingScorePercent: 70, attemptsAllowed: 2,
     questions: [
       { id: 'tji1', text: 'Which array method does NOT mutate the original array?', options: ['map', 'push', 'splice', 'sort'], correctIndex: 0 },
       { id: 'tji2', text: 'What does object destructuring let you do?', options: ['Extract properties into variables directly', 'Delete an object', 'Clone a function', 'Convert an object to JSON'], correctIndex: 0 },
@@ -409,7 +413,7 @@ export const moduleTests: ModuleTestDef[] = [
     ],
   },
   {
-    id: 'test-js-advanced', moduleId: 'js-advanced', title: 'JavaScript Advanced Module Test', timeLimitMinutes: 18, passingScorePercent: 70, attemptsAllowed: 2,
+    courseId: 'mern', id: 'test-js-advanced', moduleId: 'js-advanced', title: 'JavaScript Advanced Module Test', timeLimitMinutes: 18, passingScorePercent: 70, attemptsAllowed: 2,
     questions: [
       { id: 'tja1', text: 'A closure gives a function access to:', options: ["Its outer function's scope even after that function has returned", 'Only global variables', 'The DOM directly', 'Other files automatically'], correctIndex: 0 },
       { id: 'tja2', text: 'Which runs first: synchronous code, a microtask, or a macrotask?', options: ['Synchronous code', 'Microtask', 'Macrotask', 'They always run in parallel'], correctIndex: 0 },
@@ -419,7 +423,7 @@ export const moduleTests: ModuleTestDef[] = [
     ],
   },
   {
-    id: 'test-react', moduleId: 'react', title: 'React Module Test', timeLimitMinutes: 15, passingScorePercent: 70, attemptsAllowed: 2,
+    courseId: 'mern', id: 'test-react', moduleId: 'react', title: 'React Module Test', timeLimitMinutes: 15, passingScorePercent: 70, attemptsAllowed: 2,
     questions: [
       { id: 'tr1', text: 'Props are best described as:', options: ['Read-only data passed from a parent component', 'Mutable local state', 'Global variables', 'CSS class names'], correctIndex: 0 },
       { id: 'tr2', text: 'What triggers a React component to re-render?', options: ['A state or prop change', 'Scrolling the page', 'Refreshing CSS', 'Opening dev tools'], correctIndex: 0 },
@@ -429,7 +433,7 @@ export const moduleTests: ModuleTestDef[] = [
     ],
   },
   {
-    id: 'test-react-hooks', moduleId: 'react-hooks', title: 'React Hooks Module Test', timeLimitMinutes: 18, passingScorePercent: 70, attemptsAllowed: 2,
+    courseId: 'mern', id: 'test-react-hooks', moduleId: 'react-hooks', title: 'React Hooks Module Test', timeLimitMinutes: 18, passingScorePercent: 70, attemptsAllowed: 2,
     questions: [
       { id: 'trh1', text: 'useEffect with an empty dependency array `[]` runs:', options: ['Once, after the first render', 'On every render', 'Never', 'Only on unmount'], correctIndex: 0 },
       { id: 'trh2', text: 'A custom hook name must start with:', options: ['use', 'get', 'hook', 'with'], correctIndex: 0 },
@@ -439,7 +443,7 @@ export const moduleTests: ModuleTestDef[] = [
     ],
   },
   {
-    id: 'test-node', moduleId: 'node', title: 'Node.js Module Test', timeLimitMinutes: 20, passingScorePercent: 70, attemptsAllowed: 2,
+    courseId: 'mern', id: 'test-node', moduleId: 'node', title: 'Node.js Module Test', timeLimitMinutes: 20, passingScorePercent: 70, attemptsAllowed: 2,
     questions: [
       { id: 'tn1', text: 'Which keyword imports a module in CommonJS?', options: ['require', 'import', 'include', 'using'], correctIndex: 0 },
       { id: 'tn2', text: 'Which fs method does NOT block the event loop?', options: ['fs.readFile', 'fs.readFileSync', 'fs.statSync', 'fs.existsSync'], correctIndex: 0 },
@@ -454,61 +458,61 @@ export const moduleTests: ModuleTestDef[] = [
 
 export const codingQuestions: CodingQuestionDef[] = [
   {
-    id: 'q1', day: 1, title: 'Reverse a String', difficulty: 'Beginner', topic: 'Strings', tags: ['Strings'],
+    id: 'q1', scope: 'course', courseId: 'mern', day: 1, title: 'Reverse a String', difficulty: 'Beginner', topic: 'Strings', tags: ['Strings'],
     problemStatement: 'Given a string, return it reversed.', exampleInput: '"hello"', exampleOutput: '"olleh"',
     constraints: ['1 <= s.length <= 10^4'], hints: ['Try splitting the string into characters first.'],
     testCasesTotal: 6, keywordChecks: ['split', 'reverse', 'join'],
   },
   {
-    id: 'q2', day: 10, title: 'Count Vowels', difficulty: 'Beginner', topic: 'Strings', tags: ['Strings'],
+    id: 'q2', scope: 'course', courseId: 'mern', day: 10, title: 'Count Vowels', difficulty: 'Beginner', topic: 'Strings', tags: ['Strings'],
     problemStatement: 'Count the number of vowels in a string.', exampleInput: '"coaching"', exampleOutput: '3',
     constraints: [], hints: ['A simple loop with an includes() check works well.'],
     testCasesTotal: 5, keywordChecks: ['vowel', 'includes', 'for'],
   },
   {
-    id: 'q3', day: 20, title: 'Find the Largest Number', difficulty: 'Beginner', topic: 'Arrays', tags: ['Arrays'],
+    id: 'q3', scope: 'course', courseId: 'mern', day: 20, title: 'Find the Largest Number', difficulty: 'Beginner', topic: 'Arrays', tags: ['Arrays'],
     problemStatement: 'Return the largest number in an array.', exampleInput: '[3,9,2]', exampleOutput: '9',
     constraints: [], hints: ['Math.max with spread is the shortest solution.'],
     testCasesTotal: 5, keywordChecks: ['max', 'reduce'],
   },
   {
-    id: 'q4', day: 30, title: 'Two Sum', difficulty: 'Beginner', topic: 'Arrays', tags: ['Arrays', 'Hash Map'],
+    id: 'q4', scope: 'course', courseId: 'mern', day: 30, title: 'Two Sum', difficulty: 'Beginner', topic: 'Arrays', tags: ['Arrays', 'Hash Map'],
     problemStatement: 'Return indices of the two numbers that add up to a target.', exampleInput: '[2,7,11,15], target=9', exampleOutput: '[0,1]',
     constraints: [], hints: ['A hash map gets you from O(n²) to O(n).'],
     testCasesTotal: 8, keywordChecks: ['map', 'indexof', 'has'],
   },
   {
-    id: 'q5', day: 38, title: 'Balanced Parentheses', difficulty: 'Intermediate', topic: 'Stacks', tags: ['Stacks'],
+    id: 'q5', scope: 'course', courseId: 'mern', day: 38, title: 'Balanced Parentheses', difficulty: 'Intermediate', topic: 'Stacks', tags: ['Stacks'],
     problemStatement: 'Check whether a string of brackets is balanced.', exampleInput: '"([)]"', exampleOutput: 'false',
     constraints: [], hints: ['A stack naturally matches the most recent unmatched opening bracket.'],
     testCasesTotal: 6, keywordChecks: ['stack', 'push', 'pop'],
   },
   {
-    id: 'q6', day: 45, title: 'Group Objects by Key', difficulty: 'Intermediate', topic: 'Objects', tags: ['Objects', 'Arrays'],
+    id: 'q6', scope: 'course', courseId: 'mern', day: 45, title: 'Group Objects by Key', difficulty: 'Intermediate', topic: 'Objects', tags: ['Objects', 'Arrays'],
     problemStatement: 'Group an array of objects by a given key.', exampleInput: '[{team:"A"},{team:"B"},{team:"A"}]', exampleOutput: '{A:[...], B:[...]}',
     constraints: [], hints: ['reduce() into an accumulator object keyed by the field.'],
     testCasesTotal: 6, keywordChecks: ['reduce', 'key'],
   },
   {
-    id: 'q7', day: 47, title: 'Flatten a Nested Array', difficulty: 'Intermediate', topic: 'Arrays', tags: ['Arrays', 'Recursion'],
+    id: 'q7', scope: 'course', courseId: 'mern', day: 47, title: 'Flatten a Nested Array', difficulty: 'Intermediate', topic: 'Arrays', tags: ['Arrays', 'Recursion'],
     problemStatement: 'Given a nested array, return a single flattened array.', exampleInput: '[1,[2,[3,4]],5]', exampleOutput: '[1,2,3,4,5]',
     constraints: ['Array can be nested to arbitrary depth.'], hints: ['Array.isArray() plus recursion, or Array.prototype.flat(Infinity).'],
     testCasesTotal: 8, keywordChecks: ['isarray', 'flat', 'concat', 'recur'],
   },
   {
-    id: 'q8', day: 60, title: 'Recursion Basics', difficulty: 'Intermediate', topic: 'Recursion', tags: ['Recursion'],
+    id: 'q8', scope: 'course', courseId: 'mern', day: 60, title: 'Recursion Basics', difficulty: 'Intermediate', topic: 'Recursion', tags: ['Recursion'],
     problemStatement: 'Compute the factorial of n using recursion.', exampleInput: 'n=5', exampleOutput: '120',
     constraints: ['0 <= n <= 12'], hints: ['Define the base case first.'],
     testCasesTotal: 6, keywordChecks: ['return', 'function'],
   },
   {
-    id: 'q9', day: 100, title: 'Debouncing', difficulty: 'Advanced', topic: 'Functions', tags: ['Functions', 'Timing'],
+    id: 'q9', scope: 'course', courseId: 'mern', day: 100, title: 'Debouncing', difficulty: 'Advanced', topic: 'Functions', tags: ['Functions', 'Timing'],
     problemStatement: 'Implement a debounce(fn, delay) higher-order function.', exampleInput: 'debounce(fn, 300)', exampleOutput: 'a function that delays calls to fn',
     constraints: [], hints: ['setTimeout + clearTimeout on every call.'],
     testCasesTotal: 6, keywordChecks: ['settimeout', 'cleartimeout'],
   },
   {
-    id: 'q10', day: 120, title: 'Promise.all from Scratch', difficulty: 'Advanced', topic: 'Async', tags: ['Promises'],
+    id: 'q10', scope: 'course', courseId: 'mern', day: 120, title: 'Promise.all from Scratch', difficulty: 'Advanced', topic: 'Async', tags: ['Promises'],
     problemStatement: 'Implement a simplified version of Promise.all.', exampleInput: '[p1, p2, p3]', exampleOutput: 'a Promise that resolves with all results, or rejects on the first failure',
     constraints: [], hints: ['Track a results array and a remaining counter.'],
     testCasesTotal: 6, keywordChecks: ['promise', 'resolve', 'reject'],
@@ -534,56 +538,56 @@ const standardBackendCriteria = [
 
 export const miniTasks: MiniTaskDef[] = [
   {
-    id: 'task-html', title: 'Build a Responsive Portfolio', moduleId: 'html', difficulty: 'Beginner', estimatedDuration: '2 days', deadline: '2026-05-08',
+    courseId: 'mern', id: 'task-html', title: 'Build a Responsive Portfolio', moduleId: 'html', difficulty: 'Beginner', estimatedDuration: '2 days', deadline: '2026-05-08',
     objective: 'Build a personal portfolio page using semantic HTML and CSS.', skills: ['HTML', 'CSS'],
     requirements: ['Semantic page structure', 'About + projects sections', 'Contact form'],
     resources: ['MDN: Semantic HTML', 'Course reading: Accessible forms'],
     evaluationCriteriaTemplate: standardFrontendCriteria,
   },
   {
-    id: 'task-css', title: 'Build a Responsive Landing Page', moduleId: 'css', difficulty: 'Beginner', estimatedDuration: '2 days', deadline: '2026-05-20',
+    courseId: 'mern', id: 'task-css', title: 'Build a Responsive Landing Page', moduleId: 'css', difficulty: 'Beginner', estimatedDuration: '2 days', deadline: '2026-05-20',
     objective: 'Build a fully responsive landing page using Flexbox and Grid.', skills: ['CSS', 'Responsive Design'],
     requirements: ['Mobile-first layout', 'Flexbox/Grid based sections'],
     resources: ['MDN: CSS Grid', 'MDN: Flexbox'],
     evaluationCriteriaTemplate: standardFrontendCriteria,
   },
   {
-    id: 'task-js-utils', title: 'Build an Array Utility Library', moduleId: 'js-intermediate', difficulty: 'Intermediate', estimatedDuration: '3 days', deadline: '2026-06-14',
+    courseId: 'mern', id: 'task-js-utils', title: 'Build an Array Utility Library', moduleId: 'js-intermediate', difficulty: 'Intermediate', estimatedDuration: '3 days', deadline: '2026-06-14',
     objective: 'Build a small library of array utility functions (chunk, unique, groupBy, flatten).', skills: ['JavaScript', 'Array Methods'],
     requirements: ['chunk()', 'unique()', 'groupBy()', 'flatten()'],
     resources: ['MDN: Array methods reference'],
     evaluationCriteriaTemplate: standardBackendCriteria,
   },
   {
-    id: 'task-react-components', title: 'Build a Reusable Component Library', moduleId: 'react', difficulty: 'Intermediate', estimatedDuration: '3 days', deadline: '2026-07-10',
+    courseId: 'mern', id: 'task-react-components', title: 'Build a Reusable Component Library', moduleId: 'react', difficulty: 'Intermediate', estimatedDuration: '3 days', deadline: '2026-07-10',
     objective: 'Build a small set of reusable, prop-driven React components (Button, Card, Modal, Input).', skills: ['React', 'Component Design'],
     requirements: ['Button, Card, Modal, Input', 'Prop-driven variants'],
     resources: ['React docs: Thinking in React'],
     evaluationCriteriaTemplate: standardFrontendCriteria,
   },
   {
-    id: 'task-react-todo', title: 'Build a React Todo Application', moduleId: 'react-hooks', difficulty: 'Intermediate', estimatedDuration: '3 days', deadline: '2026-09-28',
+    courseId: 'mern', id: 'task-react-todo', title: 'Build a React Todo Application', moduleId: 'react-hooks', difficulty: 'Intermediate', estimatedDuration: '3 days', deadline: '2026-09-28',
     objective: 'Build a Todo application using React Hooks.', skills: ['React', 'State Management', 'Component Architecture'],
     requirements: ['Add Todo', 'Delete Todo', 'Mark Complete', 'Filtering', 'Persistence'],
     resources: ['React docs: useState', 'React docs: useEffect'],
     evaluationCriteriaTemplate: standardFrontendCriteria,
   },
   {
-    id: 'task-node-cli', title: 'Build a Node CLI Tool', moduleId: 'node', difficulty: 'Intermediate', estimatedDuration: '2 days', deadline: '2026-11-02',
+    courseId: 'mern', id: 'task-node-cli', title: 'Build a Node CLI Tool', moduleId: 'node', difficulty: 'Intermediate', estimatedDuration: '2 days', deadline: '2026-11-02',
     objective: 'Build a command-line tool that reads and transforms a local file.', skills: ['Node.js', 'File System'],
     requirements: ['Read from file system', 'Transform + write output', 'Handle a missing-file error gracefully'],
     resources: ['Node docs: fs module'],
     evaluationCriteriaTemplate: standardBackendCriteria,
   },
   {
-    id: 'task-express-api', title: 'Build a REST API', moduleId: 'express', difficulty: 'Advanced', estimatedDuration: '3 days', deadline: '2026-11-20',
+    courseId: 'mern', id: 'task-express-api', title: 'Build a REST API', moduleId: 'express', difficulty: 'Advanced', estimatedDuration: '3 days', deadline: '2026-11-20',
     objective: 'Build a CRUD REST API with Express.', skills: ['Express', 'REST'],
     requirements: ['GET/POST/PUT/DELETE routes', 'Input validation', 'Centralized error handling'],
     resources: ['Express docs: Routing'],
     evaluationCriteriaTemplate: standardBackendCriteria,
   },
   {
-    id: 'task-mongo-schema', title: 'Model a MongoDB Schema', moduleId: 'mongodb', difficulty: 'Intermediate', estimatedDuration: '2 days', deadline: '2026-12-02',
+    courseId: 'mern', id: 'task-mongo-schema', title: 'Model a MongoDB Schema', moduleId: 'mongodb', difficulty: 'Intermediate', estimatedDuration: '2 days', deadline: '2026-12-02',
     objective: 'Design and implement a Mongoose schema for a small app.', skills: ['MongoDB', 'Mongoose'],
     requirements: ['Schema with validation', 'At least one relationship (ref)', 'Seed script'],
     resources: ['Mongoose docs: Schemas'],
@@ -595,7 +599,7 @@ export const miniTasks: MiniTaskDef[] = [
 
 export const assessments: AssessmentDef[] = [
   {
-    id: 'assess-html-css', title: 'HTML & CSS Fundamentals', moduleId: 'css', topics: ['HTML', 'CSS', 'Responsive Design'],
+    courseId: 'mern', id: 'assess-html-css', title: 'HTML & CSS Fundamentals', moduleId: 'css', topics: ['HTML', 'CSS', 'Responsive Design'],
     timeLimitMinutes: 15, passingScorePercent: 60, attemptsAllowed: 2,
     questions: [
       { id: 'hc1', topic: 'HTML', text: 'Which tag is used for the most important heading?', options: ['<h1>', '<h6>', '<head>', '<title>'], correctIndex: 0 },
@@ -606,7 +610,7 @@ export const assessments: AssessmentDef[] = [
     ],
   },
   {
-    id: 'assess-js-basics', title: 'JavaScript Basics', moduleId: 'js-basics', topics: ['Variables', 'Loops', 'Functions'],
+    courseId: 'mern', id: 'assess-js-basics', title: 'JavaScript Basics', moduleId: 'js-basics', topics: ['Variables', 'Loops', 'Functions'],
     timeLimitMinutes: 15, passingScorePercent: 60, attemptsAllowed: 2,
     questions: [
       { id: 'jb1', topic: 'Variables', text: 'Which keyword declares a block-scoped variable?', options: ['let', 'var', 'function', 'static'], correctIndex: 0 },
@@ -617,7 +621,7 @@ export const assessments: AssessmentDef[] = [
     ],
   },
   {
-    id: 'assess-js-intermediate', title: 'JavaScript Intermediate', moduleId: 'js-intermediate', topics: ['Arrays', 'Objects', 'Closures', 'Async JavaScript'],
+    courseId: 'mern', id: 'assess-js-intermediate', title: 'JavaScript Intermediate', moduleId: 'js-intermediate', topics: ['Arrays', 'Objects', 'Closures', 'Async JavaScript'],
     timeLimitMinutes: 20, passingScorePercent: 60, attemptsAllowed: 2,
     questions: [
       { id: 'ji1', topic: 'Arrays', text: 'Which array method creates a new array from transformed elements?', options: ['map', 'forEach', 'filter', 'reduce'], correctIndex: 0 },
@@ -628,7 +632,7 @@ export const assessments: AssessmentDef[] = [
     ],
   },
   {
-    id: 'assess-js-advanced', title: 'JavaScript Advanced', moduleId: 'js-advanced', topics: ['Closures', 'Event Loop', 'Promises'],
+    courseId: 'mern', id: 'assess-js-advanced', title: 'JavaScript Advanced', moduleId: 'js-advanced', topics: ['Closures', 'Event Loop', 'Promises'],
     timeLimitMinutes: 20, passingScorePercent: 60, attemptsAllowed: 2,
     questions: [
       { id: 'ja1', topic: 'Event Loop', text: 'Which queue do resolved Promise callbacks go into?', options: ['Microtask queue', 'Macrotask queue', 'Render queue', 'Call stack'], correctIndex: 0 },
@@ -639,7 +643,7 @@ export const assessments: AssessmentDef[] = [
     ],
   },
   {
-    id: 'assess-react', title: 'React Fundamentals', moduleId: 'react', topics: ['Components', 'Props', 'State'],
+    courseId: 'mern', id: 'assess-react', title: 'React Fundamentals', moduleId: 'react', topics: ['Components', 'Props', 'State'],
     timeLimitMinutes: 20, passingScorePercent: 60, attemptsAllowed: 2,
     questions: [
       { id: 'r1', topic: 'Components', text: 'What must a React component return?', options: ['JSX (or null)', 'A string only', 'A Promise', 'An HTML file'], correctIndex: 0 },
@@ -650,7 +654,7 @@ export const assessments: AssessmentDef[] = [
     ],
   },
   {
-    id: 'assess-react-hooks', title: 'React Hooks', moduleId: 'react-hooks', topics: ['useState', 'useEffect', 'Custom Hooks'],
+    courseId: 'mern', id: 'assess-react-hooks', title: 'React Hooks', moduleId: 'react-hooks', topics: ['useState', 'useEffect', 'Custom Hooks'],
     timeLimitMinutes: 20, passingScorePercent: 60, attemptsAllowed: 2,
     questions: [
       { id: 'rh1', topic: 'useState', text: 'The useState initializer function/value is used...', options: ['Only on the first render', 'On every render', 'Never', 'Only when props change'], correctIndex: 0 },
@@ -661,7 +665,7 @@ export const assessments: AssessmentDef[] = [
     ],
   },
   {
-    id: 'assess-node', title: 'Node.js Fundamentals', moduleId: 'node', topics: ['Modules', 'File System', 'npm'],
+    courseId: 'mern', id: 'assess-node', title: 'Node.js Fundamentals', moduleId: 'node', topics: ['Modules', 'File System', 'npm'],
     timeLimitMinutes: 15, passingScorePercent: 60, attemptsAllowed: 2,
     questions: [
       { id: 'n1', topic: 'Modules', text: 'Which keyword imports a module in CommonJS?', options: ['require', 'import', 'include', 'using'], correctIndex: 0 },
@@ -676,6 +680,8 @@ export const assessments: AssessmentDef[] = [
 // ---- Major Project ----
 
 export const majorProject: MajorProjectDef = {
+  id: 'major-project-capstone',
+  courseId: 'mern',
   moduleId: 'major-project',
   title: 'Full Stack E-Commerce Application',
   description: 'A complete MERN application with product catalog, cart, checkout, auth and an admin panel.',

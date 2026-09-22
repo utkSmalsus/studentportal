@@ -1,6 +1,7 @@
 // The admin data store: the single in-memory "database" behind every repository
 // in this folder. Holds ALL courses (each fully independent — see clone()), plus
-// the operational roster data (question bank, batches, students, enrollments).
+// the operational roster data (question bank, batches, mentors, students,
+// enrollments, GitHub connections/links/activity).
 //
 // The ACTIVE course (the one the live demo student is enrolled in) is mirrored
 // in place into data/mockData.ts's exported arrays/objects on every commit, via
@@ -14,11 +15,17 @@
 // environment. Swapping this file for a real SharePoint-backed store later is
 // the only change needed — nothing above the repository layer should notice.
 import * as mockData from '../../data/mockData';
-import { CourseContent, CourseMeta, BankQuestion, Batch, StudentRecord, Enrollment, RosterEvaluationItem, DEFAULT_TIMELINE, DEFAULT_PROGRESSION_RULES, CertificateConfig, NotificationRule } from '../types';
+import {
+  CourseContent, CourseMeta, BankQuestion, Batch, StudentRecord, Enrollment, RosterEvaluationItem,
+  DEFAULT_TIMELINE, DEFAULT_PROGRESSION_RULES, DEFAULT_GITHUB_SETTINGS, CertificateConfig, NotificationRule,
+  Mentor, GitHubConnection, GitHubRepositoryLink, GitHubActivityItem, GitHubRepositorySnapshot,
+} from '../types';
 
 const STORAGE_KEY = 'coachingPlatform.adminStore.v1';
+const STORE_SCHEMA_VERSION = 2;
 
 export interface StoreShape {
+  schemaVersion: number;
   activeCourseId: string;
   courses: Record<string, CourseContent>;
   questionBank: BankQuestion[];
@@ -28,6 +35,13 @@ export interface StoreShape {
   rosterEvaluations: RosterEvaluationItem[];
   certificates: CertificateConfig[];
   notificationRules: NotificationRule[];
+  mentors: Mentor[];
+  githubConnections: GitHubConnection[];
+  githubRepositoryLinks: GitHubRepositoryLink[];
+  githubActivities: GitHubActivityItem[];
+  // Keyed by "owner/repo" — the simulated GitHub-side state (branches/commits/
+  // PRs) the mock provider serves. See admin/repository/githubRepository.ts.
+  githubRepoSnapshots: Record<string, GitHubRepositorySnapshot>;
 }
 
 export function clone<T>(value: T): T {
@@ -68,6 +82,7 @@ function buildSeedMernCourse(): CourseContent {
     weekAssignments: mockData.course.moduleOrder.map((moduleId, i) => ({ week: Math.floor(i * 1.5) + 1, moduleId })),
     courseVersion: '1.0',
     defaultProgressionRules: { ...DEFAULT_PROGRESSION_RULES },
+    githubSettings: { ...DEFAULT_GITHUB_SETTINGS },
   };
   return {
     meta,
@@ -103,6 +118,7 @@ export function buildEmptyCourse(id: string, title: string, code: string): Cours
       weekAssignments: [],
       courseVersion: '1.0',
       defaultProgressionRules: { ...DEFAULT_PROGRESSION_RULES },
+      githubSettings: { ...DEFAULT_GITHUB_SETTINGS },
     },
     course: { id, title, moduleOrder: [] },
     moduleDefs: [],
@@ -110,17 +126,24 @@ export function buildEmptyCourse(id: string, title: string, code: string): Cours
     moduleTests: [],
     assessments: [],
     miniTasks: [],
-    majorProject: { moduleId: '', title: '', description: '', deadlineInDays: 0, milestones: [], evaluationCriteriaTemplate: [] },
+    majorProject: { id: `${id}-major-project`, courseId: id, moduleId: '', title: '', description: '', deadlineInDays: 0, milestones: [], evaluationCriteriaTemplate: [] },
     codingQuestions: [],
   };
 }
 
+function buildSeedMentors(): Mentor[] {
+  return [
+    { id: 'mentor-ananya', name: 'Ananya Rao', email: 'ananya.rao@example.com', phone: '+91 90000 11111', specialization: 'Full Stack Development', experience: '6 years', status: 'active', joiningDate: '2025-01-15', bio: 'Full stack engineer turned mentor, focused on React and Node.js.' },
+    { id: 'mentor-vikram', name: 'Vikram Desai', email: 'vikram.desai@example.com', phone: '+91 90000 22222', specialization: 'Backend & Databases', experience: '8 years', status: 'active', joiningDate: '2025-03-01', bio: 'Backend specialist with a focus on API design and MongoDB.' },
+  ];
+}
+
 function buildSeedRoster(): Pick<StoreShape, 'batches' | 'students' | 'enrollments' | 'rosterEvaluations' | 'questionBank'> {
   const batches: Batch[] = [
-    { id: 'batch-mern-01', name: 'MERN-01 · Morning Batch', courseId: 'mern', startDate: '2026-04-01', endDate: '2026-09-30', scheduleDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], scheduleTime: '9:00 AM – 11:00 AM', instructor: 'Ananya Rao', status: 'active' },
+    { id: 'batch-mern-01', name: 'MERN-01 · Morning Batch', courseId: 'mern', startDate: '2026-04-01', endDate: '2026-09-30', scheduleDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], scheduleTime: '9:00 AM – 11:00 AM', mentorIds: ['mentor-ananya', 'mentor-vikram'], primaryMentorId: 'mentor-ananya', status: 'active' },
   ];
   const students: StudentRecord[] = [
-    { id: 'student-demo', name: mockData.profile.name, email: 'rahul.sharma@example.com', courseId: 'mern', batchId: 'batch-mern-01', enrollmentDate: mockData.profile.joiningDate, status: 'active', isLiveDemoStudent: true },
+    { id: 'student-demo', name: mockData.profile.name, email: 'rahul.sharma@example.com', courseId: 'mern', batchId: 'batch-mern-01', enrollmentDate: mockData.profile.joiningDate, status: 'active', isLiveDemoStudent: true, onboardingComplete: true },
     { id: 'student-2', name: 'Priya Nair', email: 'priya.nair@example.com', courseId: 'mern', batchId: 'batch-mern-01', enrollmentDate: '2026-04-01', status: 'active' },
     { id: 'student-3', name: 'Arjun Mehta', email: 'arjun.mehta@example.com', courseId: 'mern', batchId: 'batch-mern-01', enrollmentDate: '2026-04-02', status: 'active' },
     { id: 'student-4', name: 'Sana Iqbal', email: 'sana.iqbal@example.com', courseId: 'mern', batchId: 'batch-mern-01', enrollmentDate: '2026-04-03', status: 'paused' },
@@ -135,9 +158,9 @@ function buildSeedRoster(): Pick<StoreShape, 'batches' | 'students' | 'enrollmen
     status: 'active',
   }));
   const rosterEvaluations: RosterEvaluationItem[] = [
-    { id: 'reval-1', kind: 'miniTask', studentId: 'student-2', courseId: 'mern', moduleId: 'react-hooks', title: 'Build a React Todo Application', submittedAt: '2026-09-19', status: 'Under Review', attempt: 1, githubUrl: 'https://github.com/priya/react-todo', liveUrl: 'https://priya-todo.example.com', notes: 'First pass, feedback welcome.' },
-    { id: 'reval-2', kind: 'miniTask', studentId: 'student-3', courseId: 'mern', moduleId: 'node', title: 'Build a Node CLI Tool', submittedAt: '2026-09-18', status: 'Under Review', attempt: 1, githubUrl: 'https://github.com/arjun/node-cli' },
-    { id: 'reval-3', kind: 'project', studentId: 'student-2', courseId: 'mern', moduleId: 'major-project', title: 'Full Stack E-Commerce Application — Frontend Milestone', submittedAt: '2026-09-17', status: 'Under Review', attempt: 1, githubUrl: 'https://github.com/priya/ecommerce', liveUrl: 'https://priya-shop.example.com' },
+    { id: 'reval-1', kind: 'miniTask', studentId: 'student-2', courseId: 'mern', moduleId: 'react-hooks', title: 'Build a React Todo Application', submittedAt: '2026-09-19', status: 'Under Review', attempt: 1, githubUrl: 'https://github.com/priya-nair/mern-training', githubBranch: 'feature/react-todo', githubCommitSha: 'a82f31c', liveUrl: 'https://priya-todo.example.com', notes: 'First pass, feedback welcome.' },
+    { id: 'reval-2', kind: 'miniTask', studentId: 'student-3', courseId: 'mern', moduleId: 'node', title: 'Build a Node CLI Tool', submittedAt: '2026-09-18', status: 'Under Review', attempt: 1, githubUrl: 'https://github.com/arjun-mehta/mern-training', githubBranch: 'feature/node-cli', githubCommitSha: 'e91b04d' },
+    { id: 'reval-3', kind: 'project', studentId: 'student-2', courseId: 'mern', moduleId: 'major-project', title: 'Full Stack E-Commerce Application — Frontend Milestone', submittedAt: '2026-09-17', status: 'Under Review', attempt: 1, githubUrl: 'https://github.com/priya-nair/mern-training', githubBranch: 'feature/ecommerce-frontend', liveUrl: 'https://priya-shop.example.com' },
   ];
   const questionBank: BankQuestion[] = [];
   return { batches, students, enrollments, rosterEvaluations, questionBank };
@@ -153,22 +176,173 @@ const DEFAULT_NOTIFICATION_EVENTS: { event: string; description: string }[] = [
   { event: 'coursePublished', description: 'Course published' },
   { event: 'batchStarting', description: 'Batch starting soon' },
   { event: 'deadlineApproaching', description: 'Deadline approaching' },
+  { event: 'githubConnected', description: 'Student connected their GitHub account' },
+  { event: 'repositoryLinked', description: 'Student linked a training repository' },
+  { event: 'studentFallingBehind', description: 'Student falling behind expected schedule' },
 ];
+
+// Seeds the mock GitHub "server-side" state for the live demo student's
+// training repository, so Mentor Student Detail / student GitHub views have
+// real (simulated) commits/branches/PRs to show from the very first load.
+function buildSeedGithub(): Pick<StoreShape, 'githubConnections' | 'githubRepositoryLinks' | 'githubActivities' | 'githubRepoSnapshots'> {
+  const owner = 'rahul-sharma';
+  const repoName = 'mern-training';
+  const fullName = `${owner}/${repoName}`;
+  const connection: GitHubConnection = {
+    id: 'ghc-demo', studentId: 'student-demo', githubUserId: 'gh-1001', username: owner, displayName: mockData.profile.name,
+    avatarUrl: `https://avatars.githubusercontent.com/u/1001?v=4`, connectedAt: '2026-04-01T09:00:00.000Z', status: 'connected',
+  };
+  const link: GitHubRepositoryLink = {
+    id: 'ghl-demo', studentId: 'student-demo', courseId: 'mern', repositoryId: 'repo-1', repositoryName: fullName, owner, defaultBranch: 'main', connectedAt: '2026-04-01T09:05:00.000Z',
+  };
+  const commits = [
+    { sha: 'a1b2c3d', message: 'Initial course setup', branch: 'main', author: mockData.profile.name, date: '2026-04-02T10:00:00.000Z', url: `https://github.com/${fullName}/commit/a1b2c3d` },
+    { sha: 'b2c3d4e', message: 'Complete HTML exercises', branch: 'main', author: mockData.profile.name, date: '2026-04-10T10:00:00.000Z', url: `https://github.com/${fullName}/commit/b2c3d4e` },
+    { sha: 'c3d4e5f', message: 'Implement array utilities', branch: 'feature/js-intermediate', author: mockData.profile.name, date: '2026-06-01T10:00:00.000Z', url: `https://github.com/${fullName}/commit/c3d4e5f` },
+    { sha: 'a82f31c', message: 'Build React Todo application', branch: 'feature/react-todo', author: mockData.profile.name, date: '2026-08-30T10:42:00.000Z', url: `https://github.com/${fullName}/commit/a82f31c` },
+    { sha: 'e91b04d', message: 'Implement Node CLI tool', branch: 'feature/node-cli', author: mockData.profile.name, date: '2026-09-18T09:10:00.000Z', url: `https://github.com/${fullName}/commit/e91b04d` },
+  ];
+  const pullRequests = [
+    { number: 12, title: 'React Todo Application', branch: 'feature/react-todo', status: 'open' as const, createdAt: '2026-08-30T11:00:00.000Z', updatedAt: '2026-08-30T11:00:00.000Z', url: `https://github.com/${fullName}/pull/12` },
+    { number: 15, title: 'Node CLI Tool', branch: 'feature/node-cli', status: 'open' as const, createdAt: '2026-09-18T09:30:00.000Z', updatedAt: '2026-09-18T09:30:00.000Z', url: `https://github.com/${fullName}/pull/15` },
+  ];
+  const snapshot: GitHubRepositorySnapshot = {
+    owner, name: repoName, defaultBranch: 'main', branches: ['main', 'feature/react-todo', 'feature/node-api', 'feature/js-intermediate', 'feature/node-cli'], commits, pullRequests,
+  };
+  const activities: GitHubActivityItem[] = [
+    { id: 'gha-1', studentId: 'student-demo', courseId: 'mern', repositoryName: fullName, action: 'push', branch: 'feature/node-cli', message: 'Implement Node CLI tool', sha: 'e91b04d', createdAt: '2026-09-18T09:10:00.000Z' },
+    { id: 'gha-2', studentId: 'student-demo', courseId: 'mern', repositoryName: fullName, action: 'open_pr', branch: 'feature/node-cli', prNumber: 15, createdAt: '2026-09-18T09:30:00.000Z' },
+    { id: 'gha-3', studentId: 'student-demo', courseId: 'mern', repositoryName: fullName, action: 'push', branch: 'feature/react-todo', message: 'Build React Todo application', sha: 'a82f31c', createdAt: '2026-08-30T10:42:00.000Z' },
+  ];
+  return {
+    githubConnections: [connection],
+    githubRepositoryLinks: [link],
+    githubActivities: activities,
+    githubRepoSnapshots: { [fullName]: snapshot },
+  };
+}
 
 function buildSeedState(): StoreShape {
   const mern = buildSeedMernCourse();
   const roster = buildSeedRoster();
+  const github = buildSeedGithub();
   const certificates: CertificateConfig[] = [
     { courseId: 'mern', name: 'MERN Full Stack Development — Certificate of Completion', prefix: 'MERN-CERT', minAssessmentScorePercent: 60, requireAllModulesComplete: true, template: 'Standard' },
   ];
   const notificationRules: NotificationRule[] = DEFAULT_NOTIFICATION_EVENTS.map((e, i) => ({ id: `nr-${i}`, event: e.event, description: e.description, enabled: true }));
   return {
+    schemaVersion: STORE_SCHEMA_VERSION,
     activeCourseId: 'mern',
     courses: { mern },
     ...roster,
     certificates,
     notificationRules,
+    mentors: buildSeedMentors(),
+    ...github,
   };
+}
+
+// Backwards-compatible migration: a store persisted by an earlier version of
+// this app may be missing fields this version now requires (mentors, GitHub
+// collections, courseId on content entities, mentorIds on batches, …).
+// Detects gaps and backfills sane defaults in place — never drops existing
+// content or progress. Runs on every load, seeded or restored, so it also
+// covers a freshly-built seed if buildSeedState ever falls behind the shape.
+function migrate(raw: StoreShape): StoreShape {
+  const s = raw;
+  if (!s.mentors) s.mentors = [];
+  if (!s.githubConnections) s.githubConnections = [];
+  if (!s.githubRepositoryLinks) s.githubRepositoryLinks = [];
+  if (!s.githubActivities) s.githubActivities = [];
+  if (!s.githubRepoSnapshots) s.githubRepoSnapshots = {};
+  if (!s.certificates) s.certificates = [];
+  if (!s.notificationRules) s.notificationRules = [];
+  if (!s.questionBank) s.questionBank = [];
+  if (!s.rosterEvaluations) s.rosterEvaluations = [];
+
+  // Students that existed before onboarding tracking was added are already
+  // mid-course — treat them as already onboarded rather than forcing the wizard.
+  s.students.forEach((student) => {
+    if (student.onboardingComplete === undefined) student.onboardingComplete = true;
+  });
+
+  // Old Batch.instructor (a display string) -> a real seeded Mentor record,
+  // referenced by id instead of duplicated as text on every batch.
+  s.batches.forEach((b) => {
+    const legacy = b as unknown as { instructor?: string; mentorIds?: string[]; primaryMentorId?: string };
+    if (!legacy.mentorIds) {
+      let mentorId: string | undefined;
+      if (legacy.instructor) {
+        const existing = s.mentors.find((m) => m.name === legacy.instructor);
+        if (existing) {
+          mentorId = existing.id;
+        } else {
+          const created: Mentor = {
+            id: `mentor-${legacy.instructor.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+            name: legacy.instructor,
+            email: `${legacy.instructor.toLowerCase().replace(/[^a-z0-9]+/g, '.')}@example.com`,
+            status: 'active',
+            joiningDate: b.startDate || new Date().toISOString().slice(0, 10),
+          };
+          s.mentors.push(created);
+          mentorId = created.id;
+        }
+      }
+      b.mentorIds = mentorId ? [mentorId] : [];
+      b.primaryMentorId = mentorId;
+      delete legacy.instructor;
+    }
+  });
+
+  Object.keys(s.courses).forEach((courseId) => {
+    const c = s.courses[courseId];
+    if (!c.meta.githubSettings) c.meta.githubSettings = { ...DEFAULT_GITHUB_SETTINGS };
+    if (!c.meta.defaultProgressionRules) c.meta.defaultProgressionRules = { ...DEFAULT_PROGRESSION_RULES };
+    c.moduleDefs.forEach((m) => {
+      const mm = m as unknown as { courseId?: string };
+      if (!mm.courseId) mm.courseId = courseId;
+      m.topics.forEach((t) => {
+        const tt = t as unknown as { courseId?: string };
+        if (!tt.courseId) tt.courseId = courseId;
+      });
+      m.practice.forEach((p) => {
+        const pp = p as unknown as { courseId?: string; moduleId?: string };
+        if (!pp.courseId) pp.courseId = courseId;
+        if (!pp.moduleId) pp.moduleId = m.id;
+      });
+    });
+    c.topicTests.forEach((t) => {
+      const tt = t as unknown as { courseId?: string; moduleId?: string };
+      if (!tt.courseId) tt.courseId = courseId;
+      if (!tt.moduleId) tt.moduleId = c.moduleDefs.find((m) => m.topics.some((top) => top.id === t.topicId))?.id || '';
+    });
+    c.moduleTests.forEach((t) => {
+      const tt = t as unknown as { courseId?: string };
+      if (!tt.courseId) tt.courseId = courseId;
+    });
+    c.assessments.forEach((a) => {
+      const aa = a as unknown as { courseId?: string };
+      if (!aa.courseId) aa.courseId = courseId;
+    });
+    c.miniTasks.forEach((t) => {
+      const tt = t as unknown as { courseId?: string; githubRequired?: boolean };
+      if (!tt.courseId) tt.courseId = courseId;
+      if (tt.githubRequired === undefined) tt.githubRequired = false;
+    });
+    c.codingQuestions.forEach((q) => {
+      const qq = q as unknown as { scope?: string; courseId?: string };
+      if (!qq.scope) {
+        qq.scope = 'course';
+        qq.courseId = courseId;
+      }
+    });
+    const mp = c.majorProject as unknown as { id?: string; courseId?: string };
+    if (!mp.id) mp.id = `${courseId}-major-project`;
+    if (!mp.courseId) mp.courseId = courseId;
+  });
+
+  s.schemaVersion = STORE_SCHEMA_VERSION;
+  return s;
 }
 
 function loadPersisted(): StoreShape | undefined {
@@ -177,7 +351,7 @@ function loadPersisted(): StoreShape | undefined {
     if (!raw) return undefined;
     const parsed = JSON.parse(raw) as StoreShape;
     if (!parsed || !parsed.courses || !parsed.activeCourseId) return undefined;
-    return parsed;
+    return migrate(parsed);
   } catch {
     return undefined;
   }

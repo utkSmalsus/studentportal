@@ -21,11 +21,21 @@ import ProjectPage from './pages/ProjectPage';
 import PerformancePage from './pages/PerformancePage';
 import CertificatesPage from './pages/CertificatesPage';
 import ProfilePage from './pages/ProfilePage';
+import OnboardingPage from './pages/OnboardingPage';
 import { course } from '../data/selectors';
+import * as rosterRepo from '../admin/repository/rosterRepository';
+
+// The one student with a live session in this demo — see admin/repository/store.ts.
+const LIVE_STUDENT_ID = 'student-demo';
 
 export const StudentPortalShell: React.FC<IStudentPortalProps & { onOpenAdmin?: () => void }> = ({ userDisplayName, onOpenAdmin }) => {
   useAdminStoreVersion();
   const [route, setRoute] = useState<Route>({ view: 'home' });
+  const [onboarding, setOnboarding] = useState(() => rosterRepo.getStudent(LIVE_STUDENT_ID)?.onboardingComplete === false);
+
+  if (onboarding) {
+    return <OnboardingPage studentId={LIVE_STUDENT_ID} onComplete={() => setOnboarding(false)} />;
+  }
 
   const renderPage = (): React.ReactElement | null => {
     switch (route.view) {
@@ -60,7 +70,7 @@ export const StudentPortalShell: React.FC<IStudentPortalProps & { onOpenAdmin?: 
       case 'certificates':
         return <CertificatesPage />;
       case 'profile':
-        return <ProfilePage userDisplayName={userDisplayName} />;
+        return <ProfilePage userDisplayName={userDisplayName} onRestartOnboarding={() => setOnboarding(true)} />;
       default:
         return null;
     }

@@ -4,11 +4,10 @@
 // what makes an action on one screen show up correctly on every other screen
 // without a page refresh.
 import * as React from 'react';
-import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef } from 'react';
+import { createContext, useCallback, useContext, useMemo, useReducer } from 'react';
 import { StudentProgressState, NotificationItem, MiniTaskSubmissionVersion, QuizAttemptRecord, MiniTaskEvaluation } from './types';
 import { createInitialProgressState } from './initialState';
 import { evaluateCodingSubmission } from './engine/codingEvaluator';
-import { generateMiniTaskEvaluation } from './engine/miniTaskEvaluator';
 import { scoreAssessmentAttempt, AssessmentScoreResult } from './engine/assessmentEngine';
 import { scoreQuiz } from './engine/quizEngine';
 import { codingQuestions, miniTasks, assessments, majorProject, topicTests, moduleTests } from '../data/mockData';
@@ -19,8 +18,7 @@ type Action =
   | { type: 'SUBMIT_MODULE_TEST'; moduleId: string; moduleTestId: string; answers: Record<string, number> }
   | { type: 'COMPLETE_PRACTICE'; practiceId: string }
   | { type: 'RECORD_CODING_ATTEMPT'; questionId: string; code: string }
-  | { type: 'SUBMIT_MINI_TASK'; taskId: string; githubUrl: string; liveUrl: string; notes: string }
-  | { type: 'EVALUATE_MINI_TASK'; taskId: string; version: number }
+  | { type: 'SUBMIT_MINI_TASK'; taskId: string; githubUrl: string; liveUrl: string; notes: string; github?: { repositoryName?: string; branch?: string; commitSha?: string; pullRequestUrl?: string } }
   | { type: 'ADMIN_EVALUATE_MINI_TASK'; taskId: string; version: number; evaluation: MiniTaskEvaluation }
   | { type: 'RECORD_ASSESSMENT_ATTEMPT'; assessmentId: string; answers: Record<string, number> }
   | { type: 'ADVANCE_MILESTONE'; milestoneId: string; nextMilestoneId?: string }
@@ -99,6 +97,10 @@ function reducer(state: StudentProgressState, action: Action): StudentProgressSt
       const version: MiniTaskSubmissionVersion = {
         version: existing.versions.length + 1,
         githubUrl: action.githubUrl,
+        githubRepositoryName: action.github?.repositoryName,
+        githubBranch: action.github?.branch,
+        githubCommitSha: action.github?.commitSha,
+        githubPullRequestUrl: action.github?.pullRequestUrl,
         liveUrl: action.liveUrl,
         notes: action.notes,
         submittedAt: new Date().toISOString(),
@@ -107,28 +109,6 @@ function reducer(state: StudentProgressState, action: Action): StudentProgressSt
       return {
         ...state,
         miniTasks: { ...state.miniTasks, [action.taskId]: { status: 'Under Review', versions: [...existing.versions, version] } },
-        notifications,
-      };
-    }
-
-    case 'EVALUATE_MINI_TASK': {
-      const task = miniTasks.find((t) => t.id === action.taskId);
-      const entry = state.miniTasks[action.taskId];
-      if (!task || !entry) return state;
-      const versionIndex = entry.versions.findIndex((v) => v.version === action.version);
-      if (versionIndex === -1) return state;
-      const evaluation = generateMiniTaskEvaluation(task, action.version);
-      const versions = entry.versions.map((v, i) => (i === versionIndex ? { ...v, evaluation } : v));
-      const notifications = pushNotification(
-        state.notifications,
-        evaluation.outcome === 'Passed'
-          ? `"${task.title}" passed review.`
-          : `Instructor requested changes on "${task.title}".`,
-        evaluation.outcome === 'Passed' ? 'success' : 'warning'
-      );
-      return {
-        ...state,
-        miniTasks: { ...state.miniTasks, [action.taskId]: { status: evaluation.outcome, versions } },
         notifications,
       };
     }
@@ -212,7 +192,7 @@ interface AppStateContextValue {
   submitModuleTest: (moduleId: string, moduleTestId: string, answers: Record<string, number>) => void;
   completePractice: (practiceId: string) => void;
   submitCoding: (questionId: string, code: string) => void;
-  submitMiniTask: (taskId: string, githubUrl: string, liveUrl: string, notes: string) => void;
+  submitMiniTask: (taskId: string, githubUrl: string, liveUrl: string, notes: string, github?: { repositoryName?: string; branch?: string; commitSha?: string; pullRequestUrl?: string }) => void;
   adminEvaluateMiniTask: (taskId: string, version: number, evaluation: MiniTaskEvaluation) => void;
   submitAssessment: (assessmentId: string, answers: Record<string, number>) => void;
   advanceMilestone: (milestoneId: string, nextMilestoneId?: string) => void;
@@ -221,15 +201,8 @@ interface AppStateContextValue {
 
 const AppStateContext = createContext<AppStateContextValue | undefined>(undefined);
 
-// Simulates instructor review turnaround: the submission is visibly "Under Review"
-// for a moment before the (mocked) evaluation lands, instead of resolving instantly.
-const MOCK_REVIEW_DELAY_MS = 1800;
-
 export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(reducer, undefined, createInitialProgressState);
-  const timers = useRef<number[]>([]);
-
-  useEffect(() => () => { timers.current.forEach((t) => window.clearTimeout(t)); }, []);
 
   const markTopicViewed = useCallback((topicId: string) => dispatch({ type: 'MARK_TOPIC_VIEWED', topicId }), []);
   const submitTopicTest = useCallback((topicId: string, answers: Record<string, number>) => dispatch({ type: 'SUBMIT_TOPIC_TEST', topicId, answers }), []);
@@ -237,18 +210,13 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const completePractice = useCallback((practiceId: string) => dispatch({ type: 'COMPLETE_PRACTICE', practiceId }), []);
   const submitCoding = useCallback((questionId: string, code: string) => dispatch({ type: 'RECORD_CODING_ATTEMPT', questionId, code }), []);
 
-  const submitMiniTask = useCallback((taskId: string, githubUrl: string, liveUrl: string, notes: string) => {
-    // Capture the version number this submission will become BEFORE dispatching,
-    // so the delayed evaluation targets the right version even if the student
-    // somehow submits again before the mock review completes.
-    const existingVersions = state.miniTasks[taskId]?.versions.length || 0;
-    const versionNumber = existingVersions + 1;
-    dispatch({ type: 'SUBMIT_MINI_TASK', taskId, githubUrl, liveUrl, notes });
-    const timer = window.setTimeout(() => {
-      dispatch({ type: 'EVALUATE_MINI_TASK', taskId, version: versionNumber });
-    }, MOCK_REVIEW_DELAY_MS);
-    timers.current.push(timer);
-  }, [state.miniTasks]);
+  const submitMiniTask = useCallback((taskId: string, githubUrl: string, liveUrl: string, notes: string, github?: { repositoryName?: string; branch?: string; commitSha?: string; pullRequestUrl?: string }) => {
+    // A submission now waits for a real Mentor Portal review (see
+    // admin/pages/EvaluationQueuePage.tsx / adminEvaluateMiniTask) instead of
+    // resolving itself — GitHub activity is evidence, not completion, and only
+    // a mentor's evaluation decides Passed vs Changes Requested.
+    dispatch({ type: 'SUBMIT_MINI_TASK', taskId, githubUrl, liveUrl, notes, github });
+  }, []);
 
   const adminEvaluateMiniTask = useCallback((taskId: string, version: number, evaluation: MiniTaskEvaluation) => dispatch({ type: 'ADMIN_EVALUATE_MINI_TASK', taskId, version, evaluation }), []);
   const submitAssessment = useCallback((assessmentId: string, answers: Record<string, number>) => dispatch({ type: 'RECORD_ASSESSMENT_ATTEMPT', assessmentId, answers }), []);

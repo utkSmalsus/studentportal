@@ -10,8 +10,8 @@ import { CodingQuestionDef, Difficulty } from '../../data/types';
 
 const difficultyColor: Record<Difficulty, SemanticColor> = { Beginner: 'green', Intermediate: 'amber', Advanced: 'red' };
 
-const emptyDraft = (day: number): Omit<CodingQuestionDef, 'id'> => ({
-  day, title: '', difficulty: 'Beginner', topic: '', tags: [], problemStatement: '', exampleInput: '', exampleOutput: '', constraints: [], hints: [], testCasesTotal: 5, keywordChecks: [],
+const emptyDraft = (courseId: string, day: number): Omit<CodingQuestionDef, 'id'> => ({
+  scope: 'course', courseId, day, title: '', difficulty: 'Beginner', topic: '', tags: [], problemStatement: '', exampleInput: '', exampleOutput: '', constraints: [], hints: [], testCasesTotal: 5, keywordChecks: [],
 });
 
 const DailyCodingAdminPage: React.FC = () => {
@@ -25,7 +25,7 @@ const DailyCodingAdminPage: React.FC = () => {
   if (!content) return null;
   const questions = content.codingQuestions;
 
-  const openCreate = (): void => setDraft(emptyDraft((questions[questions.length - 1]?.day || 0) + 1));
+  const openCreate = (): void => setDraft(emptyDraft(courseId, (questions[questions.length - 1]?.day || 0) + 1));
   const openEdit = (q: CodingQuestionDef): void => {
     setEditing(q);
     setDraft({ ...q });

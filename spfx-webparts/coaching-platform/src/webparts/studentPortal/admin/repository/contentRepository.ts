@@ -14,7 +14,7 @@ export function createModuleTest(courseId: string, moduleId: string, input: { ti
   const c = content(courseId);
   const m = c?.moduleDefs.find((mm) => mm.id === moduleId);
   if (!c || !m) return undefined;
-  const test: ModuleTestDef = { id: `${moduleId}-moduletest`, moduleId, questions: [], ...input };
+  const test: ModuleTestDef = { id: `${moduleId}-moduletest`, courseId, moduleId, questions: [], ...input };
   c.moduleTests.push(test);
   m.moduleTestId = test.id;
   commit(courseId);
@@ -58,7 +58,7 @@ export function createAssessment(courseId: string, moduleId: string, input: { ti
   const c = content(courseId);
   const m = c?.moduleDefs.find((mm) => mm.id === moduleId);
   if (!c || !m) return undefined;
-  const assessment: AssessmentDef = { id: `${moduleId}-assessment`, moduleId, questions: [], ...input };
+  const assessment: AssessmentDef = { id: `${moduleId}-assessment`, courseId, moduleId, questions: [], ...input };
   c.assessments.push(assessment);
   m.assessmentId = assessment.id;
   commit(courseId);

@@ -35,6 +35,7 @@ const groups: NavGroup[] = [
     items: [
       { view: 'students', label: 'Students', route: { view: 'students' }, icon: UsersIcon },
       { view: 'batches', label: 'Batches', route: { view: 'batches' }, icon: BuildingIcon },
+      { view: 'mentors', label: 'Mentors', route: { view: 'mentors' }, icon: UsersIcon },
       { view: 'enrollments', label: 'Enrollments', route: { view: 'enrollments' }, icon: CalendarIcon },
     ],
   },
@@ -50,13 +51,14 @@ const groups: NavGroup[] = [
   },
 ];
 
-const AdminLayout: React.FC<{ route: AdminRoute; onNavigate: (r: AdminRoute) => void; userDisplayName: string; onExitAdmin: () => void; children: React.ReactNode }> = ({
-  route,
-  onNavigate,
-  userDisplayName,
-  onExitAdmin,
-  children,
-}) => {
+const AdminLayout: React.FC<{
+  route: AdminRoute;
+  onNavigate: (r: AdminRoute) => void;
+  userDisplayName: string;
+  onExitAdmin: () => void;
+  onOpenMentorPortal: () => void;
+  children: React.ReactNode;
+}> = ({ route, onNavigate, userDisplayName, onExitAdmin, onOpenMentorPortal, children }) => {
   const active = adminTopLevelFor(route);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -85,9 +87,15 @@ const AdminLayout: React.FC<{ route: AdminRoute; onNavigate: (r: AdminRoute) => 
           <div className="px-3 pt-4 lg:pt-5">
             <button
               onClick={onExitAdmin}
-              className="w-full flex items-center gap-2 text-left px-3 py-2 rounded-lg text-[13px] font-semibold text-indigo-300 hover:bg-white/5 mb-3"
+              className="w-full flex items-center gap-2 text-left px-3 py-2 rounded-lg text-[13px] font-semibold text-indigo-300 hover:bg-white/5 mb-1.5"
             >
               <ArrowLeftIcon className="w-4 h-4" /> Back to Student View
+            </button>
+            <button
+              onClick={onOpenMentorPortal}
+              className="w-full flex items-center gap-2 text-left px-3 py-2 rounded-lg text-[13px] font-semibold text-emerald-300 hover:bg-white/5 mb-3"
+            >
+              <UsersIcon className="w-4 h-4" /> Mentor Portal
             </button>
           </div>
           <div className="flex-1 overflow-auto px-3">

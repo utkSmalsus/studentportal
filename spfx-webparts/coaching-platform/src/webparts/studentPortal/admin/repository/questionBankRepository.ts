@@ -5,6 +5,16 @@ import { state, commit } from './store';
 import { BankQuestion, bankQuestionToTestQuestion } from '../types';
 import { Difficulty, TopicTestQuestionDef, AssessmentQuestionDef } from '../../data/types';
 import * as curriculum from './curriculumRepository';
+import { assertModuleBelongsToCourse, assertTopicBelongsToModule } from './validation';
+
+// A question cannot point at a module/topic from a different course — see
+// spec section 14/20. Thrown, not silently ignored, so the admin UI can
+// surface a real error instead of a question that quietly saved with a
+// stale/invalid relationship.
+function assertRelationships(q: Pick<BankQuestion, 'courseId' | 'moduleId' | 'topicId'>): void {
+  if (q.moduleId) assertModuleBelongsToCourse(q.courseId, q.moduleId);
+  if (q.moduleId && q.topicId) assertTopicBelongsToModule(q.courseId, q.moduleId, q.topicId);
+}
 
 export function listQuestions(courseId: string): BankQuestion[] {
   return state.questionBank.filter((q) => q.courseId === courseId);
@@ -32,6 +42,7 @@ export function searchQuestions(filter: QuestionFilter): BankQuestion[] {
 }
 
 export function createQuestion(input: Omit<BankQuestion, 'id'>): BankQuestion {
+  assertRelationships(input);
   const q: BankQuestion = { ...input, id: `q-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}` };
   state.questionBank.push(q);
   commit(input.courseId);
@@ -41,6 +52,8 @@ export function createQuestion(input: Omit<BankQuestion, 'id'>): BankQuestion {
 export function updateQuestion(id: string, patch: Partial<Omit<BankQuestion, 'id'>>): void {
   const q = state.questionBank.find((qq) => qq.id === id);
   if (!q) return;
+  const next = { ...q, ...patch };
+  assertRelationships(next);
   Object.assign(q, patch);
   commit(q.courseId);
 }

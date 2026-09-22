@@ -35,6 +35,32 @@ export interface WeekAssignment {
   moduleId: string;
 }
 
+export type GithubRepositoryStrategy = 'single' | 'major-project';
+export type GithubBranchStrategy = 'main' | 'feature' | 'feature-pr';
+
+// A course's GitHub requirements. Off by default for non-development courses;
+// development courses seed with GitHub on and required at onboarding — see
+// store.ts's DEFAULT_GITHUB_SETTINGS.
+export interface CourseGithubSettings {
+  enabled: boolean;
+  requiredForOnboarding: boolean;
+  trainingRepositoryRequired: boolean;
+  pullRequestRequired: boolean;
+  defaultBranch: string;
+  repositoryStrategy: GithubRepositoryStrategy;
+  branchStrategy: GithubBranchStrategy;
+}
+
+export const DEFAULT_GITHUB_SETTINGS: CourseGithubSettings = {
+  enabled: true,
+  requiredForOnboarding: true,
+  trainingRepositoryRequired: true,
+  pullRequestRequired: false,
+  defaultBranch: 'main',
+  repositoryStrategy: 'single',
+  branchStrategy: 'feature',
+};
+
 export interface CourseMeta {
   id: string;
   title: string;
@@ -56,6 +82,7 @@ export interface CourseMeta {
   // Applied to every new module created in this course; each module can still
   // override it individually from the Curriculum Builder.
   defaultProgressionRules: ProgressionRules;
+  githubSettings: CourseGithubSettings;
 }
 
 // One full course = its operational meta + its content bundle (data/types.ts shapes).
@@ -102,8 +129,29 @@ export interface Batch {
   endDate: string;
   scheduleDays: string[];
   scheduleTime: string;
-  instructor: string;
+  // A batch may have several mentors; primaryMentorId (if set) must also be
+  // present in mentorIds. Students inherit access to all of them via their
+  // batch assignment — see admin/repository/mentorRepository.ts.
+  mentorIds: string[];
+  primaryMentorId?: string;
   status: BatchStatus;
+}
+
+// ---- Mentor: a first-class entity, not an "instructor" display string. ----
+
+export type MentorStatus = 'active' | 'inactive';
+
+export interface Mentor {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  specialization?: string;
+  experience?: string;
+  status: MentorStatus;
+  avatarUrl?: string;
+  joiningDate: string;
+  bio?: string;
 }
 
 export type StudentStatus = 'active' | 'paused' | 'completed' | 'dropped';
@@ -119,6 +167,9 @@ export interface StudentRecord {
   // The one student whose progress is the live AppStateContext in this session.
   // Every other roster row is realistic seed data with no live backing state.
   isLiveDemoStudent?: boolean;
+  phone?: string;
+  avatarUrl?: string;
+  onboardingComplete?: boolean;
 }
 
 export type EnrollmentStatus = 'active' | 'completed' | 'withdrawn';
@@ -150,6 +201,9 @@ export interface RosterEvaluationItem {
   status: EvaluationStatus;
   attempt: number;
   githubUrl?: string;
+  githubBranch?: string;
+  githubCommitSha?: string;
+  githubPullRequestUrl?: string;
   liveUrl?: string;
   notes?: string;
   feedback?: string;
@@ -160,7 +214,82 @@ export interface ValidationIssue {
   message: string;
 }
 
-export type AdminRole = 'admin' | 'instructor' | 'student';
+export type AdminRole = 'admin' | 'mentor' | 'student';
+
+// ---- GitHub integration domain. Kept behind a service abstraction (see
+// admin/repository/githubRepository.ts / IGitHubProvider) — components never
+// call a GitHub API directly, and no OAuth token is ever stored here. ----
+
+export type GithubConnectionStatus = 'connected' | 'disconnected';
+
+export interface GitHubConnection {
+  id: string;
+  studentId: string;
+  githubUserId: string;
+  username: string;
+  displayName: string;
+  avatarUrl: string;
+  connectedAt: string;
+  status: GithubConnectionStatus;
+}
+
+// A student can have a different training repository per course.
+export interface GitHubRepositoryLink {
+  id: string;
+  studentId: string;
+  courseId: string;
+  repositoryId: string;
+  repositoryName: string; // "owner/repo"
+  owner: string;
+  defaultBranch: string;
+  connectedAt: string;
+}
+
+export type GitHubActivityAction = 'push' | 'commit' | 'create_branch' | 'open_pr' | 'merge_pr';
+
+// Evidence of work, never completion — see githubRepository.ts header comment.
+export interface GitHubActivityItem {
+  id: string;
+  studentId: string;
+  courseId: string;
+  repositoryName: string;
+  action: GitHubActivityAction;
+  branch?: string;
+  message?: string;
+  sha?: string;
+  prNumber?: number;
+  createdAt: string;
+}
+
+export interface GitHubCommit {
+  sha: string;
+  message: string;
+  branch: string;
+  author: string;
+  date: string;
+  url: string;
+}
+
+export type GitHubPullRequestStatus = 'open' | 'merged' | 'closed';
+
+export interface GitHubPullRequest {
+  number: number;
+  title: string;
+  branch: string;
+  status: GitHubPullRequestStatus;
+  createdAt: string;
+  updatedAt: string;
+  url: string;
+}
+
+export interface GitHubRepositorySnapshot {
+  owner: string;
+  name: string;
+  defaultBranch: string;
+  branches: string[];
+  commits: GitHubCommit[];
+  pullRequests: GitHubPullRequest[];
+}
 
 export interface CertificateConfig {
   courseId: string;

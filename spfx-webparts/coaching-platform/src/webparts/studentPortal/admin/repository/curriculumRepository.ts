@@ -18,6 +18,7 @@ export function createModule(courseId: string, input: { title: string; group: Mo
   const id = `${courseId}-mod-${Date.now().toString(36)}`;
   const module: ModuleDef = {
     id,
+    courseId,
     title: input.title,
     group: input.group,
     estimatedDuration: input.estimatedDuration,
@@ -111,12 +112,15 @@ export function createTopic(courseId: string, moduleId: string, input: { title: 
   const id = `${moduleId}-t${m.topics.length + 1}-${Date.now().toString(36)}`;
   const test: TopicTestDef = {
     id: `${id}-test`,
+    courseId,
+    moduleId,
     topicId: id,
     passingScorePercent: 70,
     questions: [],
   };
   const topic: TopicDef = {
     id,
+    courseId,
     moduleId,
     title: input.title,
     estimatedMinutes: input.estimatedMinutes,

@@ -8,6 +8,8 @@ export type Difficulty = 'Beginner' | 'Intermediate' | 'Advanced';
 
 export interface PracticeDef {
   id: string;
+  courseId: string;
+  moduleId: string;
   title: string;
   description: string;
   estimatedMinutes: number;
@@ -34,6 +36,8 @@ export interface TopicTestQuestionDef {
 // whether the student absorbed THIS topic, not a formal exam.
 export interface TopicTestDef {
   id: string;
+  courseId: string;
+  moduleId: string;
   topicId: string;
   passingScorePercent: number;
   questions: TopicTestQuestionDef[];
@@ -41,6 +45,7 @@ export interface TopicTestDef {
 
 export interface TopicDef {
   id: string;
+  courseId: string;
   moduleId: string;
   title: string;
   estimatedMinutes: number;
@@ -57,6 +62,7 @@ export interface TopicDef {
 // "assessment unlocked" in the module completion flow.
 export interface ModuleTestDef {
   id: string;
+  courseId: string;
   moduleId: string;
   title: string;
   timeLimitMinutes: number;
@@ -93,6 +99,7 @@ export const DEFAULT_PROGRESSION_RULES: ProgressionRules = {
 
 export interface ModuleDef {
   id: string;
+  courseId: string;
   title: string;
   group: ModuleGroup;
   estimatedDuration: string;
@@ -120,8 +127,15 @@ export interface Course {
 
 // ---- Daily Coding (independent of the course journey) ----
 
+// Daily Coding stays independent of module progression, but a challenge can
+// still be scoped to one course ("course") or shared across every course
+// ("global"). Course-scoped challenges require courseId; global ones don't.
+export type CodingQuestionScope = 'course' | 'global';
+
 export interface CodingQuestionDef {
   id: string;
+  scope: CodingQuestionScope;
+  courseId?: string;
   day: number;
   title: string;
   difficulty: Difficulty;
@@ -142,8 +156,13 @@ export interface CodingQuestionDef {
 
 // ---- Mini Tasks ----
 
+// A student's own connected repo can satisfy 'student-repo' without asking them
+// to paste a URL every time; 'custom' is the fallback when none is connected.
+export type GithubRepositoryMode = 'student-repo' | 'custom';
+
 export interface MiniTaskDef {
   id: string;
+  courseId: string;
   title: string;
   moduleId: string;
   difficulty: Difficulty;
@@ -154,6 +173,13 @@ export interface MiniTaskDef {
   skills: string[];
   resources: string[];
   evaluationCriteriaTemplate: { label: string; maxScore: number }[];
+  // GitHub submission requirements — see admin/github/types.ts for the runtime
+  // connection/repository/activity entities this references.
+  githubRequired?: boolean;
+  githubRepositoryMode?: GithubRepositoryMode;
+  githubBranch?: string;
+  githubPath?: string;
+  pullRequestRequired?: boolean;
 }
 
 // ---- Assessments ----
@@ -168,6 +194,7 @@ export interface AssessmentQuestionDef {
 
 export interface AssessmentDef {
   id: string;
+  courseId: string;
   title: string;
   moduleId: string;
   topics: string[];
@@ -187,6 +214,8 @@ export interface MilestoneDef {
 }
 
 export interface MajorProjectDef {
+  id: string;
+  courseId: string;
   moduleId: string;
   title: string;
   description: string;

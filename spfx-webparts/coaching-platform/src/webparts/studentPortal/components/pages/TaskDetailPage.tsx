@@ -7,6 +7,9 @@ import { AlertIcon } from '../../ui/icons';
 import { useAppState } from '../../state/AppStateContext';
 import { getMiniTaskById } from '../../data/selectors';
 import { MiniTaskProgressEntry } from '../../state/types';
+import * as githubRepo from '../../admin/repository/githubRepository';
+
+const LIVE_STUDENT_ID = 'student-demo';
 
 const needsSubmission = (status: string): boolean =>
   status === 'Not Started' || status === 'In Progress' || status === 'Changes Requested';
@@ -49,7 +52,11 @@ const TaskDetailPage: React.FC<{ taskId: string; onNavigate: (r: Route) => void 
   const entry = progress.miniTasks[taskId];
   const latestVersion = entry?.versions[entry.versions.length - 1];
 
+  const repoLink = task ? githubRepo.getRepositoryLink(LIVE_STUDENT_ID, task.courseId) : undefined;
+
   const [githubUrl, setGithubUrl] = useState(latestVersion?.githubUrl || '');
+  const [branch, setBranch] = useState(latestVersion?.githubBranch || task?.githubBranch || '');
+  const [pullRequestUrl, setPullRequestUrl] = useState(latestVersion?.githubPullRequestUrl || '');
   const [liveUrl, setLiveUrl] = useState(latestVersion?.liveUrl || '');
   const [notes, setNotes] = useState('');
 
@@ -57,9 +64,18 @@ const TaskDetailPage: React.FC<{ taskId: string; onNavigate: (r: Route) => void 
   const status = entry?.status || 'Not Started';
   const showForm = needsSubmission(status);
   const isChangesRequested = status === 'Changes Requested';
+  const effectiveGithubUrl = repoLink ? `https://github.com/${repoLink.repositoryName}` : githubUrl;
+  const canSubmit = task.githubRequired ? !!repoLink || !!githubUrl : true;
 
   const handleSubmit = (): void => {
-    submitMiniTask(taskId, githubUrl, liveUrl, notes);
+    submitMiniTask(taskId, effectiveGithubUrl, liveUrl, notes, {
+      repositoryName: repoLink?.repositoryName,
+      branch: branch || undefined,
+      pullRequestUrl: pullRequestUrl || undefined,
+    });
+    if (repoLink) {
+      githubRepo.recordActivity(LIVE_STUDENT_ID, task.courseId, repoLink.repositoryName, 'push', { branch: branch || undefined, message: `Submit "${task.title}"` });
+    }
     setNotes('');
   };
 
@@ -122,8 +138,25 @@ const TaskDetailPage: React.FC<{ taskId: string; onNavigate: (r: Route) => void 
           {showForm ? (
             <Card>
               <SectionTitle>{isChangesRequested ? 'Fix & Resubmit' : 'Submission'}</SectionTitle>
+              {task.githubRequired && !repoLink && (
+                <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-lg px-3.5 py-3 mb-3.5">
+                  <AlertIcon className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <p className="text-sm text-amber-800">
+                    This task requires a GitHub submission. Connect your GitHub account and training repository from your Profile to submit without pasting a URL.
+                  </p>
+                </div>
+              )}
               <div className="space-y-3.5 max-w-lg">
-                <Field label="GitHub Repository" value={githubUrl} onChange={setGithubUrl} placeholder="https://github.com/you/project" />
+                {repoLink ? (
+                  <div>
+                    <label className="text-sm font-semibold text-slate-700">Repository</label>
+                    <div className="w-full mt-1.5 border border-slate-200 bg-slate-50 rounded-lg px-3.5 py-2.5 text-sm text-slate-700">{repoLink.repositoryName}</div>
+                  </div>
+                ) : (
+                  <Field label="GitHub Repository" value={githubUrl} onChange={setGithubUrl} placeholder="https://github.com/you/project" />
+                )}
+                <Field label="Branch" value={branch} onChange={setBranch} placeholder="feature/react-todo" />
+                {task.pullRequestRequired && <Field label="Pull Request URL" value={pullRequestUrl} onChange={setPullRequestUrl} placeholder="https://github.com/you/project/pull/1" />}
                 <Field label="Live URL" value={liveUrl} onChange={setLiveUrl} placeholder="https://your-app.example.com" />
                 <div>
                   <label className="text-sm font-semibold text-slate-700">Additional Notes</label>
@@ -136,7 +169,7 @@ const TaskDetailPage: React.FC<{ taskId: string; onNavigate: (r: Route) => void 
                   />
                 </div>
               </div>
-              <PrimaryButton className="mt-4" onClick={handleSubmit} disabled={!githubUrl}>
+              <PrimaryButton className="mt-4" onClick={handleSubmit} disabled={!canSubmit}>
                 {isChangesRequested ? 'Resubmit for Review' : 'Submit for Review'}
               </PrimaryButton>
             </Card>

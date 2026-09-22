@@ -8,10 +8,11 @@ import type { IStudentPortalProps } from './IStudentPortalProps';
 import { AppStateProvider } from '../state/AppStateContext';
 import { StudentPortalShell } from './StudentPortal';
 import AdminApp from '../admin/AdminApp';
+import MentorApp from '../mentor/MentorApp';
 import * as rosterRepo from '../admin/repository/rosterRepository';
 import { getActiveCourseId } from '../admin/repository/courseRepository';
 
-type Mode = 'student' | 'admin';
+type Mode = 'student' | 'admin' | 'mentor';
 
 const AppRootShell: React.FC<IStudentPortalProps> = ({ userDisplayName, ...rest }) => {
   const [mode, setMode] = useState<Mode>('student');
@@ -28,7 +29,18 @@ const AppRootShell: React.FC<IStudentPortalProps> = ({ userDisplayName, ...rest 
   };
 
   if (mode === 'admin') {
-    return <AdminApp userDisplayName={userDisplayName} onExitAdmin={() => setMode('student')} onPreviewAsStudent={handlePreviewAsStudent} />;
+    return (
+      <AdminApp
+        userDisplayName={userDisplayName}
+        onExitAdmin={() => setMode('student')}
+        onPreviewAsStudent={handlePreviewAsStudent}
+        onOpenMentorPortal={() => setMode('mentor')}
+      />
+    );
+  }
+
+  if (mode === 'mentor') {
+    return <MentorApp onExitMentor={() => setMode('admin')} />;
   }
 
   return <StudentPortalShell userDisplayName={userDisplayName} {...rest} onOpenAdmin={() => setMode('admin')} />;
