@@ -4,10 +4,13 @@
 // in any JS environment. Not wired into the app UI; call runIsolationChecks()
 // from a scratch script or the browser console when touching this layer.
 //
-// ponytail: this asserts against the shared in-memory `state` singleton
-// (admin/repository/store.ts), so it creates real students/courses/progress
-// as a side effect — run it against a throwaway store (e.g. a fresh
-// localStorage/Node process), never against production data.
+// Each exported check function snapshots the store before running and
+// restores it afterward (see withStateSnapshot below) — it still exercises
+// the real repository layer end to end (create/enroll/dispatch/evaluate all
+// really happen), but the demo's actual courses/students/progress are back
+// exactly as they were once the function returns, even if the checks fail
+// partway through. Safe to run against a live dev session's localStorage.
+import { state as storeState, clone, commit } from './store';
 import * as courseRepo from './courseRepository';
 import * as rosterRepo from './rosterRepository';
 import * as mentorRepo from './mentorRepository';
@@ -25,7 +28,22 @@ function check(name: string, condition: boolean, detail?: string): CheckResult {
   return { name, passed: condition, detail };
 }
 
+function withStateSnapshot<T>(run: () => T): T {
+  const snapshot = clone(storeState);
+  try {
+    return run();
+  } finally {
+    Object.keys(storeState).forEach((key) => delete (storeState as unknown as Record<string, unknown>)[key]);
+    Object.assign(storeState, snapshot);
+    commit();
+  }
+}
+
 export function runIsolationChecks(): { passed: boolean; results: CheckResult[] } {
+  return withStateSnapshot(() => runIsolationChecksImpl());
+}
+
+function runIsolationChecksImpl(): { passed: boolean; results: CheckResult[] } {
   const results: CheckResult[] = [];
   const today = new Date().toISOString().slice(0, 10);
 
@@ -134,6 +152,10 @@ export function runIsolationChecks(): { passed: boolean; results: CheckResult[] 
 // — a second, independent course/roster setup so it never interacts with
 // runIsolationChecks()'s state.
 export function runProjectResubmissionChecks(): { passed: boolean; results: CheckResult[] } {
+  return withStateSnapshot(() => runProjectResubmissionChecksImpl());
+}
+
+function runProjectResubmissionChecksImpl(): { passed: boolean; results: CheckResult[] } {
   const results: CheckResult[] = [];
   const today = new Date().toISOString().slice(0, 10);
 
@@ -260,6 +282,75 @@ export function runProjectResubmissionChecks(): { passed: boolean; results: Chec
     'Scenario 8/9: each course\'s content lookup returns its own Major Project, never the other\'s',
     pContent?.majorProject.title === 'P Capstone Project' && qContent?.majorProject.title === 'Q Capstone Project'
   ));
+
+  return { passed: results.every((r) => r.passed), results };
+}
+
+// Section 13's checklist items not already covered above: D (task content
+// stays course-scoped), the Mini Task equivalent of G/H (resubmission
+// preserves the prior attempt, evaluating one attempt never touches
+// another), and F (evaluating a submission in one course never mutates a
+// different course's data at all, not just "doesn't appear in its queue").
+export function runMiniTaskCourseIsolationChecks(): { passed: boolean; results: CheckResult[] } {
+  return withStateSnapshot(() => runMiniTaskCourseIsolationChecksImpl());
+}
+
+function runMiniTaskCourseIsolationChecksImpl(): { passed: boolean; results: CheckResult[] } {
+  const results: CheckResult[] = [];
+  const today = new Date().toISOString().slice(0, 10);
+
+  const courseX = courseRepo.createCourse({ title: 'Task Check Course X', code: 'TSK-X' }).id;
+  const courseY = courseRepo.createCourse({ title: 'Task Check Course Y', code: 'TSK-Y' }).id;
+  [courseX, courseY].forEach((courseId) => {
+    const content = courseRepo.getCourseContent(courseId)!;
+    content.moduleDefs.push({ id: `${courseId}-m1`, courseId, title: `${courseId} Module 1`, description: '', order: 1, topics: [], practice: [], miniTaskId: `${courseId}-task-1` } as unknown as import('../../data/types').ModuleDef);
+    content.course.moduleOrder.push(`${courseId}-m1`);
+    content.miniTasks.push({
+      id: `${courseId}-task-1`, courseId, moduleId: `${courseId}-m1`, title: `${courseId} Task`, objective: '', requirements: [], resources: [], skills: [],
+      difficulty: 'Beginner', estimatedDuration: '', deadline: '', githubRequired: false, pullRequestRequired: false, evaluationCriteriaTemplate: [{ label: 'Quality', maxScore: 10 }],
+    } as unknown as import('../../data/types').MiniTaskDef);
+  });
+
+  const studentX1 = rosterRepo.createStudent({ name: 'Task Student X1', email: 'tsk-x1@example.com', courseId: courseX, enrollmentDate: today, status: 'active' });
+  const studentY1 = rosterRepo.createStudent({ name: 'Task Student Y1', email: 'tsk-y1@example.com', courseId: courseY, enrollmentDate: today, status: 'active' });
+  rosterRepo.enrollStudent({ studentId: studentX1.id, courseId: courseX, startDate: today, expectedCompletion: today });
+  rosterRepo.enrollStudent({ studentId: studentY1.id, courseId: courseY, startDate: today, expectedCompletion: today });
+
+  // D: task content is course-scoped — each course's own content lookup only
+  // ever contains its own task, never the other course's.
+  const xContent = courseRepo.getCourseContent(courseX);
+  const yContent = courseRepo.getCourseContent(courseY);
+  results.push(check(
+    'Section 13.D: mini task content stays scoped to its own course',
+    xContent?.miniTasks.some((t) => t.id === `${courseX}-task-1`) === true &&
+      xContent?.miniTasks.some((t) => t.id === `${courseY}-task-1`) === false &&
+      yContent?.miniTasks.some((t) => t.id === `${courseY}-task-1`) === true
+  ));
+
+  // G/H for Mini Tasks: submit, get Changes Requested, resubmit — attempt 1
+  // preserved untouched, attempt 2 is new and independently evaluable.
+  progressRepository.dispatch(studentX1.id, courseX, { type: 'SUBMIT_MINI_TASK', taskId: `${courseX}-task-1`, githubUrl: 'https://github.com/x1/repo', liveUrl: '', notes: 'v1' });
+  submissionRepo.evaluateSubmission(studentX1.id, courseX, `${courseX}-task-1`, 1, { criteria: [{ label: 'Quality', score: 5, maxScore: 10 }], feedback: 'Needs work', outcome: 'Changes Requested' });
+  progressRepository.dispatch(studentX1.id, courseX, { type: 'SUBMIT_MINI_TASK', taskId: `${courseX}-task-1`, githubUrl: 'https://github.com/x1/repo-v2', liveUrl: '', notes: 'v2' });
+  const attempt1BeforeSecondEval = { ...progressRepository.getProgress(studentX1.id, courseX)!.miniTasks[`${courseX}-task-1`].versions[0] };
+  submissionRepo.evaluateSubmission(studentX1.id, courseX, `${courseX}-task-1`, 2, { criteria: [{ label: 'Quality', score: 9, maxScore: 10 }], feedback: 'Great fix', outcome: 'Passed' });
+  const xEntryAfter = progressRepository.getProgress(studentX1.id, courseX)!.miniTasks[`${courseX}-task-1`];
+  results.push(check(
+    'Section 13.G/H: mini task resubmission preserves attempt 1, and evaluating attempt 2 never modifies it',
+    xEntryAfter.versions.length === 2 &&
+      JSON.stringify(xEntryAfter.versions[0]) === JSON.stringify(attempt1BeforeSecondEval) &&
+      xEntryAfter.versions[1].evaluation?.outcome === 'Passed' &&
+      xEntryAfter.status === 'Passed'
+  ));
+
+  // F: evaluating a submission in course X never mutates course Y's data at
+  // all — not just "doesn't show up in Y's queue" (already covered
+  // elsewhere), but the actual stored record is untouched.
+  progressRepository.dispatch(studentY1.id, courseY, { type: 'SUBMIT_MINI_TASK', taskId: `${courseY}-task-1`, githubUrl: 'https://github.com/y1/repo', liveUrl: '', notes: '' });
+  const yBeforeXEval = JSON.stringify(progressRepository.getProgress(studentY1.id, courseY));
+  submissionRepo.evaluateSubmission(studentX1.id, courseX, `${courseX}-task-1`, 2, { criteria: [{ label: 'Quality', score: 10, maxScore: 10 }], feedback: 'Re-scored', outcome: 'Passed' });
+  const yAfterXEval = JSON.stringify(progressRepository.getProgress(studentY1.id, courseY));
+  results.push(check('Section 13.F: evaluating a submission in one course never mutates another course\'s data', yBeforeXEval === yAfterXEval));
 
   return { passed: results.every((r) => r.passed), results };
 }

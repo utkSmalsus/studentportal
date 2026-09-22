@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useState } from 'react';
 import type { IStudentPortalProps } from './IStudentPortalProps';
-import { AppStateProvider } from '../state/AppStateContext';
+import { useAppState } from '../state/AppStateContext';
 import { useAdminStoreVersion } from '../admin/hooks';
 import NavShell from '../navigation/NavShell';
 import { Route } from '../navigation/types';
@@ -25,16 +25,14 @@ import OnboardingPage from './pages/OnboardingPage';
 import { course } from '../data/selectors';
 import * as rosterRepo from '../admin/repository/rosterRepository';
 
-// The one student with a live session in this demo — see admin/repository/store.ts.
-const LIVE_STUDENT_ID = 'student-demo';
-
 export const StudentPortalShell: React.FC<IStudentPortalProps & { onOpenAdmin?: () => void }> = ({ userDisplayName, onOpenAdmin }) => {
   useAdminStoreVersion();
+  const { studentId } = useAppState();
   const [route, setRoute] = useState<Route>({ view: 'home' });
-  const [onboarding, setOnboarding] = useState(() => rosterRepo.getStudent(LIVE_STUDENT_ID)?.onboardingComplete === false);
+  const [onboarding, setOnboarding] = useState(() => rosterRepo.getStudent(studentId)?.onboardingComplete === false);
 
   if (onboarding) {
-    return <OnboardingPage studentId={LIVE_STUDENT_ID} onComplete={() => setOnboarding(false)} />;
+    return <OnboardingPage studentId={studentId} onComplete={() => setOnboarding(false)} />;
   }
 
   const renderPage = (): React.ReactElement | null => {
@@ -82,11 +80,3 @@ export const StudentPortalShell: React.FC<IStudentPortalProps & { onOpenAdmin?: 
     </NavShell>
   );
 };
-
-const StudentPortal: React.FC<IStudentPortalProps> = (props) => (
-  <AppStateProvider>
-    <StudentPortalShell {...props} />
-  </AppStateProvider>
-);
-
-export default StudentPortal;

@@ -3,6 +3,7 @@
 import { state, commit } from './store';
 import { ModuleTestDef, AssessmentDef, CodingQuestionDef, MiniTaskDef, MajorProjectDef, MilestoneDef, TopicTestQuestionDef, AssessmentQuestionDef } from '../../data/types';
 import { CourseContent } from '../types';
+import { assertModuleBelongsToCourse } from './validation';
 
 function content(courseId: string): CourseContent | undefined {
   return state.courses[courseId];
@@ -140,6 +141,7 @@ export function duplicateCodingQuestion(courseId: string, id: string): CodingQue
 export function createMiniTask(courseId: string, input: Omit<MiniTaskDef, 'id'>): MiniTaskDef | undefined {
   const c = content(courseId);
   if (!c) return undefined;
+  assertModuleBelongsToCourse(courseId, input.moduleId);
   const task: MiniTaskDef = { ...input, id: `task-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}` };
   c.miniTasks.push(task);
   const m = c.moduleDefs.find((mm) => mm.id === input.moduleId);
@@ -152,6 +154,7 @@ export function updateMiniTask(courseId: string, id: string, patch: Partial<Omit
   const c = content(courseId);
   const task = c?.miniTasks.find((t) => t.id === id);
   if (!c || !task) return;
+  if (patch.moduleId) assertModuleBelongsToCourse(courseId, patch.moduleId);
   Object.assign(task, patch);
   commit(courseId);
 }

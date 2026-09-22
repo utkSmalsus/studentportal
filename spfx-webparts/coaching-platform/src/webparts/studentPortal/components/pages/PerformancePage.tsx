@@ -45,10 +45,10 @@ const PerformancePage: React.FC<{ onNavigate: (r: Route) => void }> = ({ onNavig
   const categories = [
     { label: 'Learning', percent: totalLessons ? Math.round((doneLessons / totalLessons) * 100) : 0 },
     { label: 'Practice', percent: totalPractice ? Math.round((donePractice / totalPractice) * 100) : 0 },
-    { label: 'Daily Coding', percent: Math.round((coding.solved / codingQuestions.length) * 100) },
+    { label: 'Daily Coding', percent: codingQuestions.length ? Math.round((coding.solved / codingQuestions.length) * 100) : 0 },
     { label: 'Mini Tasks', percent: tasks.total ? Math.round((tasks.completed / tasks.total) * 100) : 0 },
     { label: 'Assessments', percent: assess.total ? Math.round((assess.completed / assess.total) * 100) : 0 },
-    { label: 'Major Project', percent: projectUnlocked ? Math.round((projectDone / majorProject.milestones.length) * 100) : 0 },
+    { label: 'Major Project', percent: projectUnlocked && majorProject.milestones.length ? Math.round((projectDone / majorProject.milestones.length) * 100) : 0 },
   ];
 
   const strengths = skills.filter((s) => s.level === 'Strong');

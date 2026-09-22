@@ -10,8 +10,6 @@ import * as rosterRepo from '../../admin/repository/rosterRepository';
 import * as mentorRepo from '../../admin/repository/mentorRepository';
 import * as githubRepo from '../../admin/repository/githubRepository';
 
-const LIVE_STUDENT_ID = 'student-demo';
-
 const GROUP_LABEL: Record<ModuleGroup, string> = {
   Foundation: 'Foundation',
   Programming: 'JavaScript',
@@ -36,12 +34,12 @@ const Row: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value
 );
 
 const ProfilePage: React.FC<{ userDisplayName: string; onRestartOnboarding?: () => void }> = ({ userDisplayName, onRestartOnboarding }) => {
-  const { state: progress } = useAppState();
-  const student = rosterRepo.getStudent(LIVE_STUDENT_ID);
+  const { state: progress, studentId } = useAppState();
+  const student = rosterRepo.getStudent(studentId);
   const batch = rosterRepo.listBatches().find((b) => b.id === student?.batchId);
   const mentor = batch?.primaryMentorId ? mentorRepo.getMentor(batch.primaryMentorId) : undefined;
-  const connection = githubRepo.getConnection(LIVE_STUDENT_ID);
-  const repoLink = student ? githubRepo.getRepositoryLink(LIVE_STUDENT_ID, student.courseId) : undefined;
+  const connection = githubRepo.getConnection(studentId);
+  const repoLink = student ? githubRepo.getRepositoryLink(studentId, student.courseId) : undefined;
   const overallPercent = courseOverallProgress(progress);
   const current = progression.currentModule(course, moduleDefs, progress);
   const currentGroup = current?.group;
@@ -182,7 +180,7 @@ const ProfilePage: React.FC<{ userDisplayName: string; onRestartOnboarding?: () 
                   <a href={`https://github.com/${connection.username}`} target="_blank" rel="noreferrer">
                     <SecondaryButton className="text-xs px-3 py-1.5">Open GitHub</SecondaryButton>
                   </a>
-                  <SecondaryButton className="text-xs px-3 py-1.5" onClick={() => githubRepo.disconnectAccount(LIVE_STUDENT_ID)}>
+                  <SecondaryButton className="text-xs px-3 py-1.5" onClick={() => githubRepo.disconnectAccount(studentId)}>
                     Disconnect
                   </SecondaryButton>
                 </div>

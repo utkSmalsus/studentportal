@@ -80,7 +80,16 @@ const EnrollmentsPage: React.FC = () => {
             </Select>
           </FormField>
           <FormField label="Course">
-            <Select value={courseId} onChange={(e) => setCourseId(e.target.value)}>
+            <Select
+              value={courseId}
+              onChange={(e) => {
+                // A batch belongs to one course — switching courses without
+                // clearing this would silently submit a batch from the
+                // student's PREVIOUS course selection.
+                setCourseId(e.target.value);
+                setBatchId('');
+              }}
+            >
               {courses.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.title}

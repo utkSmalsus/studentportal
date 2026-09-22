@@ -6,7 +6,7 @@ import { useAppState } from '../../state/AppStateContext';
 import { getAssessmentById } from '../../data/selectors';
 
 const AssessmentAttemptPage: React.FC<{ assessmentId: string; onNavigate: (r: Route) => void }> = ({ assessmentId, onNavigate }) => {
-  const { submitAssessment } = useAppState();
+  const { state: progress, submitAssessment } = useAppState();
   const a = getAssessmentById(assessmentId);
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number>>({});
@@ -14,6 +14,21 @@ const AssessmentAttemptPage: React.FC<{ assessmentId: string; onNavigate: (r: Ro
   if (!a) return <EmptyState title="Assessment not found" />;
   if (a.questions.length === 0) {
     return <EmptyState title="No questions available yet" description="This assessment hasn't been set up in the question bank." />;
+  }
+
+  // Same rule AssessmentDetailPage uses to decide whether to show "Retake" —
+  // enforced here too, since this page is reachable directly by route, not
+  // only through that button.
+  const attempts = progress.assessments[a.id]?.attempts || [];
+  const latest = attempts[attempts.length - 1];
+  const attemptAllowed = attempts.length === 0 || (!latest.passed && attempts.length < a.attemptsAllowed);
+  if (!attemptAllowed) {
+    return (
+      <EmptyState
+        title={latest.passed ? 'You already passed this assessment' : 'No attempts remaining'}
+        description={latest.passed ? 'Nothing more to do here.' : `You've used all ${a.attemptsAllowed} allowed attempts.`}
+      />
+    );
   }
 
   const question = a.questions[index];

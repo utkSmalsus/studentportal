@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useState } from 'react';
 import { PageHeader, PrimaryButton, SecondaryButton } from '../../ui/Primitives';
-import { AdminTable, AdminColumn, StatusBadge, Drawer, FormField, TextInput, TextArea, Select, EmptyRowsState } from '../ui/AdminPrimitives';
+import { AdminTable, AdminColumn, StatusBadge, Drawer, FormField, TextInput, TextArea, Select, EmptyRowsState, ConfirmDialog } from '../ui/AdminPrimitives';
 import { PlusIcon, SearchIcon, TrashIcon } from '../../ui/icons';
 import { SemanticColor } from '../../ui/statusMeta';
 import * as courseRepo from '../repository/courseRepository';
@@ -20,6 +20,7 @@ const QuestionBankPage: React.FC = () => {
   const [difficulty, setDifficulty] = useState<Difficulty | ''>('');
   const [editing, setEditing] = useState<BankQuestion | undefined>();
   const [draft, setDraft] = useState<Omit<BankQuestion, 'id'> | undefined>();
+  const [deleteTarget, setDeleteTarget] = useState<BankQuestion | undefined>();
 
   const content = courseRepo.getCourseContent(courseId);
   const modules = content?.moduleDefs || [];
@@ -51,7 +52,7 @@ const QuestionBankPage: React.FC = () => {
       label: '',
       className: 'text-right',
       render: (q) => (
-        <button onClick={(e) => { e.stopPropagation(); questionRepo.deleteQuestion(q.id); }} className="text-slate-300 hover:text-red-500">
+        <button onClick={(e) => { e.stopPropagation(); setDeleteTarget(q); }} className="text-slate-300 hover:text-red-500">
           <TrashIcon className="w-4 h-4" />
         </button>
       ),
@@ -171,6 +172,19 @@ const QuestionBankPage: React.FC = () => {
           </div>
         )}
       </Drawer>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Delete this question?"
+        description={deleteTarget ? `"${deleteTarget.text}" will be permanently removed. This won't remove it from tests it's already been copied into.` : undefined}
+        confirmLabel="Delete"
+        danger
+        onConfirm={() => {
+          if (deleteTarget) questionRepo.deleteQuestion(deleteTarget.id);
+          setDeleteTarget(undefined);
+        }}
+        onCancel={() => setDeleteTarget(undefined)}
+      />
     </div>
   );
 };

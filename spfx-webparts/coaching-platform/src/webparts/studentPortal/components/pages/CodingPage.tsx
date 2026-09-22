@@ -175,7 +175,7 @@ const CodingPage: React.FC<{ onNavigate: (r: Route) => void }> = ({ onNavigate }
               {solvedCount} <span className="text-base font-medium text-slate-400">/ {totalScheduled} days</span>
             </div>
             <div className="mt-3">
-              <ProgressBar percent={(solvedCount / totalScheduled) * 100} />
+              <ProgressBar percent={totalScheduled === 0 ? 0 : (solvedCount / totalScheduled) * 100} />
             </div>
             <div className="grid grid-cols-2 gap-3 mt-4 text-sm">
               <div>

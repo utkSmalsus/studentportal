@@ -1,8 +1,9 @@
 import * as React from 'react';
 import { useState } from 'react';
 import { TopicTestQuestionDef } from '../../data/types';
-import { Card, PrimaryButton, SecondaryButton, ProgressBar } from '../../ui/Primitives';
+import { Card, PrimaryButton, SecondaryButton, ProgressBar, EmptyState } from '../../ui/Primitives';
 import { CheckIcon, AlertIcon } from '../../ui/icons';
+import { scoreQuiz } from '../../state/engine/quizEngine';
 
 // Shared single-question quiz flow for Topic Tests and Module Tests: pick an
 // answer, see immediate correct/incorrect feedback, move on; a result screen at
@@ -23,6 +24,10 @@ const QuizAttemptPage: React.FC<QuizAttemptPageProps> = ({ title, questions, pas
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [revealed, setRevealed] = useState(false);
   const [done, setDone] = useState(false);
+
+  if (questions.length === 0) {
+    return <EmptyState title="No questions yet" description="This test hasn't been configured with any questions." />;
+  }
 
   const question = questions[index];
   const isLast = index === questions.length - 1;
@@ -52,8 +57,7 @@ const QuizAttemptPage: React.FC<QuizAttemptPageProps> = ({ title, questions, pas
 
   if (done) {
     const correct = questions.filter((q) => answers[q.id] === q.correctIndex).length;
-    const scorePercent = Math.round((correct / questions.length) * 100);
-    const passed = scorePercent >= passingScorePercent;
+    const { scorePercent, passed } = scoreQuiz(questions, answers, passingScorePercent);
     return (
       <div className="max-w-lg mx-auto text-center py-10">
         <div className={`mx-auto w-14 h-14 rounded-full flex items-center justify-center ${passed ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>

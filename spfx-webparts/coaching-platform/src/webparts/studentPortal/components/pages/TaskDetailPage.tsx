@@ -3,13 +3,12 @@ import { useState } from 'react';
 import { Route } from '../../navigation/types';
 import { BackLink, Card, SectionTitle, PrimaryButton, StatusPill, EmptyState, LoadingState, EvaluationRubric, Tag, PhaseStepper, PhaseState } from '../../ui/Primitives';
 import { miniTaskStatusMeta, difficultyColor } from '../../ui/statusMeta';
-import { AlertIcon } from '../../ui/icons';
+import { AlertIcon, LockIcon } from '../../ui/icons';
 import { useAppState } from '../../state/AppStateContext';
-import { getMiniTaskById } from '../../data/selectors';
+import * as progression from '../../state/engine/progression';
+import { getMiniTaskById, moduleDefs, getModuleById } from '../../data/selectors';
 import { MiniTaskProgressEntry } from '../../state/types';
 import * as githubRepo from '../../admin/repository/githubRepository';
-
-const LIVE_STUDENT_ID = 'student-demo';
 
 const needsSubmission = (status: string): boolean =>
   status === 'Not Started' || status === 'In Progress' || status === 'Changes Requested';
@@ -47,12 +46,12 @@ const Field: React.FC<{ label: string; value: string; onChange: (v: string) => v
 );
 
 const TaskDetailPage: React.FC<{ taskId: string; onNavigate: (r: Route) => void }> = ({ taskId, onNavigate }) => {
-  const { state: progress, submitMiniTask } = useAppState();
+  const { state: progress, studentId, submitMiniTask } = useAppState();
   const task = getMiniTaskById(taskId);
   const entry = progress.miniTasks[taskId];
   const latestVersion = entry?.versions[entry.versions.length - 1];
 
-  const repoLink = task ? githubRepo.getRepositoryLink(LIVE_STUDENT_ID, task.courseId) : undefined;
+  const repoLink = task ? githubRepo.getRepositoryLink(studentId, task.courseId) : undefined;
 
   const [githubUrl, setGithubUrl] = useState(latestVersion?.githubUrl || '');
   const [branch, setBranch] = useState(latestVersion?.githubBranch || task?.githubBranch || '');
@@ -61,6 +60,21 @@ const TaskDetailPage: React.FC<{ taskId: string; onNavigate: (r: Route) => void 
   const [notes, setNotes] = useState('');
 
   if (!task) return <EmptyState title="Task not found" />;
+
+  const owningModule = getModuleById(task.moduleId);
+  const isLocked = owningModule ? !progression.isModuleUnlocked(owningModule, moduleDefs, progress) : false;
+  if (isLocked && owningModule) {
+    return (
+      <div>
+        <BackLink onClick={() => onNavigate({ view: 'tasks' })}>Mini Tasks</BackLink>
+        <h1 className="text-2xl font-bold text-slate-400">{task.title}</h1>
+        <div className="mt-6">
+          <EmptyState title="This task is locked" description={progression.lockedReason(owningModule, moduleDefs)} icon={<LockIcon className="w-5 h-5" />} />
+        </div>
+      </div>
+    );
+  }
+
   const status = entry?.status || 'Not Started';
   const showForm = needsSubmission(status);
   const isChangesRequested = status === 'Changes Requested';
@@ -74,7 +88,7 @@ const TaskDetailPage: React.FC<{ taskId: string; onNavigate: (r: Route) => void 
       pullRequestUrl: pullRequestUrl || undefined,
     });
     if (repoLink) {
-      githubRepo.recordActivity(LIVE_STUDENT_ID, task.courseId, repoLink.repositoryName, 'push', { branch: branch || undefined, message: `Submit "${task.title}"` });
+      githubRepo.recordActivity(studentId, task.courseId, repoLink.repositoryName, 'push', { branch: branch || undefined, message: `Submit "${task.title}"` });
     }
     setNotes('');
   };

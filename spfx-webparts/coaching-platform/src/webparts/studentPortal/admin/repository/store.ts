@@ -20,6 +20,7 @@ import {
   DEFAULT_TIMELINE, DEFAULT_PROGRESSION_RULES, DEFAULT_GITHUB_SETTINGS, CertificateConfig, NotificationRule,
   Mentor, GitHubConnection, GitHubRepositoryLink, GitHubActivityItem, GitHubRepositorySnapshot,
 } from '../types';
+import { Course, ModuleDef, TopicContent, TopicTestDef, ModuleTestDef, AssessmentDef, MiniTaskDef, CodingQuestionDef, MajorProjectDef } from '../../data/types';
 import { StudentProgress } from '../../state/types';
 import { createInitialProgressState, createEmptyProgressState } from '../../state/initialState';
 
@@ -102,6 +103,184 @@ function buildSeedMernCourse(): CourseContent {
   };
 }
 
+// A second, independently-authored course — proves the platform is actually
+// course-generic (content resolved through courseRepository, never a
+// MERN-shaped assumption baked into a page) rather than merely claiming to
+// be. Deliberately leaner than MERN (4 modules vs 15+): enough to demo every
+// journey stage — module→topic→test, module test, mini task, assessment,
+// daily coding, major project — without padding out unnecessary seed data.
+function buildSeedPythonCourse(): CourseContent {
+  const courseId = 'python-backend';
+  const topicContent = (learn: string[], concepts: string[]): TopicContent => ({
+    whatYoullLearn: learn,
+    keyConcepts: concepts,
+    examples: [],
+    notes: [],
+    resources: [],
+  });
+  const topicTest = (id: string, moduleId: string, topicId: string, q1: string, q2: string): TopicTestDef => ({
+    id, courseId, moduleId, topicId, passingScorePercent: 70,
+    questions: [
+      { id: `${id}-q1`, text: q1, options: ['Correct answer', 'Wrong option A', 'Wrong option B', 'Wrong option C'], correctIndex: 0 },
+      { id: `${id}-q2`, text: q2, options: ['Wrong option A', 'Correct answer', 'Wrong option B', 'Wrong option C'], correctIndex: 1 },
+    ],
+  });
+
+  const moduleDefs: ModuleDef[] = [
+    {
+      id: 'py-foundations', courseId, title: 'Python Foundations', group: 'Foundation', estimatedDuration: '2 weeks',
+      whatYoullLearn: ['Python syntax and data types', 'Control flow, functions and modules'],
+      topics: [
+        { id: 'py-syntax', courseId, moduleId: 'py-foundations', title: 'Python Syntax & Data Types', estimatedMinutes: 40, content: topicContent(['Variables and types', 'Strings, lists, dicts'], ['Dynamic typing', 'Mutability']), testId: 'py-syntax-test' },
+        { id: 'py-control-flow', courseId, moduleId: 'py-foundations', title: 'Control Flow & Functions', estimatedMinutes: 45, content: topicContent(['if/for/while', 'Defining functions'], ['Scope', 'Default arguments']), testId: 'py-control-flow-test' },
+      ],
+      practice: [], moduleTestId: 'py-foundations-test',
+    },
+    {
+      id: 'py-oop-data', courseId, title: 'Object-Oriented Python', group: 'Programming', estimatedDuration: '2 weeks',
+      whatYoullLearn: ['Classes and objects', 'Collections and file I/O'],
+      topics: [
+        { id: 'py-oop', courseId, moduleId: 'py-oop-data', title: 'Classes & Objects', estimatedMinutes: 45, content: topicContent(['Defining classes', 'Inheritance'], ['self', 'Encapsulation']), testId: 'py-oop-test' },
+        { id: 'py-collections', courseId, moduleId: 'py-oop-data', title: 'Collections & File I/O', estimatedMinutes: 40, content: topicContent(['List/dict comprehensions', 'Reading and writing files'], ['Comprehensions', 'Context managers']), testId: 'py-collections-test' },
+      ],
+      practice: [], miniTaskId: 'task-py-cli', assessmentId: 'assess-py-foundations', prerequisiteModuleId: 'py-foundations',
+    },
+    {
+      id: 'py-django', courseId, title: 'Django Web Development', group: 'Backend', estimatedDuration: '3 weeks',
+      whatYoullLearn: ['Django models and the ORM', 'Views, templates and forms'],
+      topics: [
+        { id: 'py-django-models', courseId, moduleId: 'py-django', title: 'Django Models & ORM', estimatedMinutes: 50, content: topicContent(['Defining models', 'Querysets'], ['Migrations', 'Relationships']), testId: 'py-django-models-test' },
+        { id: 'py-django-views', courseId, moduleId: 'py-django', title: 'Views, Templates & Forms', estimatedMinutes: 50, content: topicContent(['Function-based views', 'Django forms'], ['URL routing', 'Template rendering']), testId: 'py-django-views-test' },
+      ],
+      practice: [], moduleTestId: 'py-django-test', miniTaskId: 'task-py-api', prerequisiteModuleId: 'py-oop-data',
+    },
+    {
+      id: 'py-rest-db', courseId, title: 'REST APIs & Databases', group: 'Backend', estimatedDuration: '3 weeks',
+      whatYoullLearn: ['Building REST APIs with Django REST Framework', 'PostgreSQL and migrations'],
+      topics: [
+        { id: 'py-drf', courseId, moduleId: 'py-rest-db', title: 'Django REST Framework', estimatedMinutes: 50, content: topicContent(['Serializers', 'ViewSets and routers'], ['Serialization', 'Authentication']), testId: 'py-drf-test' },
+        { id: 'py-postgres', courseId, moduleId: 'py-rest-db', title: 'PostgreSQL & Migrations', estimatedMinutes: 45, content: topicContent(['Schema design', 'Running migrations'], ['Indexes', 'Foreign keys']), testId: 'py-postgres-test' },
+      ],
+      practice: [], assessmentId: 'assess-py-backend', prerequisiteModuleId: 'py-django',
+    },
+  ];
+
+  const topicTests: TopicTestDef[] = [
+    topicTest('py-syntax-test', 'py-foundations', 'py-syntax', 'Which of these is a mutable type in Python?', 'What does `len()` return for a string?'),
+    topicTest('py-control-flow-test', 'py-foundations', 'py-control-flow', 'Which keyword defines a function?', 'What does a function return by default with no `return` statement?'),
+    topicTest('py-oop-test', 'py-oop-data', 'py-oop', 'What is `self` in a Python method?', 'Which keyword is used for inheritance?'),
+    topicTest('py-collections-test', 'py-oop-data', 'py-collections', 'What does a list comprehension produce?', 'Which statement safely closes a file automatically?'),
+    topicTest('py-django-models-test', 'py-django', 'py-django-models', 'What generates SQL schema changes from a Django model?', 'What is the Django ORM used for?'),
+    topicTest('py-django-views-test', 'py-django', 'py-django-views', 'What renders an HTML template in a Django view?', 'What handles user input validation in Django?'),
+    topicTest('py-drf-test', 'py-rest-db', 'py-drf', 'What converts model instances to JSON in DRF?', 'What DRF class handles a full set of CRUD routes?'),
+    topicTest('py-postgres-test', 'py-rest-db', 'py-postgres', 'What speeds up lookups on a large table?', 'What links a row in one table to another?'),
+  ];
+
+  const moduleTests: ModuleTestDef[] = [
+    {
+      id: 'py-foundations-test', courseId, moduleId: 'py-foundations', title: 'Python Foundations Module Test', timeLimitMinutes: 20, passingScorePercent: 70, attemptsAllowed: 3,
+      questions: [
+        { id: 'py-foundations-test-q1', text: 'Which of these is immutable in Python?', options: ['tuple', 'list', 'dict', 'set'], correctIndex: 0 },
+        { id: 'py-foundations-test-q2', text: 'What does `range(3)` produce?', options: ['0, 1, 2', '1, 2, 3', '0, 1, 2, 3', '1, 2'], correctIndex: 0 },
+      ],
+    },
+    {
+      id: 'py-django-test', courseId, moduleId: 'py-django', title: 'Django Fundamentals Module Test', timeLimitMinutes: 20, passingScorePercent: 70, attemptsAllowed: 3,
+      questions: [
+        { id: 'py-django-test-q1', text: 'What command applies pending migrations?', options: ['manage.py migrate', 'manage.py runserver', 'manage.py shell', 'manage.py test'], correctIndex: 0 },
+        { id: 'py-django-test-q2', text: 'Which file maps URLs to views?', options: ['urls.py', 'models.py', 'admin.py', 'settings.py'], correctIndex: 0 },
+      ],
+    },
+  ];
+
+  const assessments: AssessmentDef[] = [
+    {
+      id: 'assess-py-foundations', courseId, title: 'Python Foundations Assessment', moduleId: 'py-oop-data', topics: ['Syntax', 'OOP'], timeLimitMinutes: 30, passingScorePercent: 60, attemptsAllowed: 2,
+      questions: [
+        { id: 'assess-py-foundations-q1', topic: 'OOP', text: 'What does `__init__` do in a Python class?', options: ['Initializes a new instance', 'Deletes an instance', 'Imports a module', 'Defines a constant'], correctIndex: 0 },
+        { id: 'assess-py-foundations-q2', topic: 'Syntax', text: 'Which of these is a valid dict comprehension?', options: ['{k: v for k, v in items}', '[k: v for k, v in items]', '(k: v for k, v in items)', '{k, v for k, v in items}'], correctIndex: 0 },
+      ],
+    },
+    {
+      id: 'assess-py-backend', courseId, title: 'Backend & APIs Assessment', moduleId: 'py-rest-db', topics: ['Django', 'REST', 'Databases'], timeLimitMinutes: 35, passingScorePercent: 60, attemptsAllowed: 2,
+      questions: [
+        { id: 'assess-py-backend-q1', topic: 'REST', text: 'What HTTP method typically creates a new resource?', options: ['POST', 'GET', 'DELETE', 'OPTIONS'], correctIndex: 0 },
+        { id: 'assess-py-backend-q2', topic: 'Databases', text: 'What keyword defines a foreign key relationship in a Django model?', options: ['ForeignKey', 'ManyToMany', 'PrimaryKey', 'Relation'], correctIndex: 0 },
+      ],
+    },
+  ];
+
+  const miniTasks: MiniTaskDef[] = [
+    {
+      id: 'task-py-cli', courseId, title: 'Build a Python CLI Tool', moduleId: 'py-oop-data', difficulty: 'Beginner', estimatedDuration: '2 days', deadline: '2026-10-15',
+      objective: 'Build a small command-line tool that reads a CSV file and prints summary statistics.',
+      requirements: ['Accept a file path as an argument', 'Handle a missing/invalid file gracefully', 'Print row count and column averages'],
+      skills: ['Python', 'File I/O', 'argparse'], resources: [],
+      evaluationCriteriaTemplate: [{ label: 'Code Quality', maxScore: 10 }, { label: 'Functionality', maxScore: 10 }, { label: 'Error Handling', maxScore: 10 }],
+      githubRequired: true,
+    },
+    {
+      id: 'task-py-api', courseId, title: 'Build a Django REST API', moduleId: 'py-django', difficulty: 'Intermediate', estimatedDuration: '3 days', deadline: '2026-11-10',
+      objective: 'Build a small Django REST Framework API with one model and full CRUD endpoints.',
+      requirements: ['A model with at least 3 fields', 'Serializer and ViewSet', 'Registered in a router'],
+      skills: ['Django', 'DRF', 'REST APIs'], resources: [],
+      evaluationCriteriaTemplate: [{ label: 'Code Quality', maxScore: 10 }, { label: 'API Design', maxScore: 10 }, { label: 'Best Practices', maxScore: 10 }],
+      githubRequired: true, pullRequestRequired: true,
+    },
+  ];
+
+  const codingQuestions: CodingQuestionDef[] = [
+    {
+      id: 'py-q1', scope: 'course', courseId, day: 1, title: 'Reverse a List', difficulty: 'Beginner', topic: 'Lists', tags: ['Lists'],
+      problemStatement: 'Given a list, return it reversed.', exampleInput: '[1,2,3]', exampleOutput: '[3,2,1]',
+      constraints: [], hints: ['Slicing with a step of -1 reverses a list.'], testCasesTotal: 5, keywordChecks: ['reverse', 'return'],
+    },
+    {
+      id: 'py-q2', scope: 'course', courseId, day: 8, title: 'Count Word Frequency', difficulty: 'Beginner', topic: 'Dictionaries', tags: ['Dictionaries'],
+      problemStatement: 'Given a string, return a dict of word counts.', exampleInput: '"a b a"', exampleOutput: '{"a": 2, "b": 1}',
+      constraints: [], hints: ['A dict with .get(word, 0) + 1 works well.'], testCasesTotal: 5, keywordChecks: ['split', 'dict', 'for'],
+    },
+    {
+      id: 'py-q3', scope: 'course', courseId, day: 15, title: 'FizzBuzz', difficulty: 'Beginner', topic: 'Control Flow', tags: ['Loops'],
+      problemStatement: 'Print Fizz/Buzz/FizzBuzz for numbers 1 to n.', exampleInput: '15', exampleOutput: 'Fizz, Buzz, FizzBuzz at multiples of 3, 5, 15',
+      constraints: [], hints: ['Check divisibility by 15 before 3 or 5.'], testCasesTotal: 6, keywordChecks: ['%', 'for', 'if'],
+    },
+    {
+      id: 'py-q4', scope: 'course', courseId, day: 22, title: 'Two Sum', difficulty: 'Intermediate', topic: 'Dictionaries', tags: ['Dictionaries', 'Arrays'],
+      problemStatement: 'Given a list and a target, return indices of two numbers that add to the target.', exampleInput: '[2,7,11,15], 9', exampleOutput: '[0,1]',
+      constraints: [], hints: ['A dict of value -> index avoids the O(n²) brute force.'], testCasesTotal: 6, keywordChecks: ['dict', 'for', 'return'],
+    },
+  ];
+
+  const majorProject: MajorProjectDef = {
+    id: `${courseId}-major-project`, courseId, moduleId: 'py-rest-db', title: 'Full Stack Django Capstone', description: 'Design and ship a Django REST API-backed application end to end, from data model to a deployed capstone project.',
+    deadlineInDays: 30,
+    milestones: [
+      { id: 'py-m1', title: 'Data Model & Planning', objectives: ['Define the domain model', 'Plan the API surface'], deliverables: ['ER diagram', 'Endpoint list'] },
+      { id: 'py-m2', title: 'API Implementation', objectives: ['Build models, serializers and viewsets', 'Add authentication'], deliverables: ['Working API'] },
+      { id: 'py-m3', title: 'Testing & Docs', objectives: ['Write tests for core endpoints', 'Document the API'], deliverables: ['Test suite', 'API docs'] },
+      { id: 'py-m4', title: 'Deployment', objectives: ['Deploy the API', 'Connect a Postgres database'], deliverables: ['Live deployment link'] },
+    ],
+    evaluationCriteriaTemplate: [{ label: 'Code Quality', maxScore: 10 }, { label: 'API Design', maxScore: 10 }, { label: 'Testing', maxScore: 10 }, { label: 'Deployment', maxScore: 10 }],
+  };
+
+  const course: Course = { id: courseId, title: 'Python Backend Development', moduleOrder: moduleDefs.map((m) => m.id) };
+
+  const meta: CourseMeta = {
+    id: courseId, title: course.title, code: 'PY-2026', category: 'Backend Development', difficulty: 'Intermediate',
+    description: 'A backend-focused program covering Python fundamentals, object-oriented programming, Django and REST APIs, ending in a deployed capstone project.',
+    shortDescription: 'Become a backend developer with Python and Django.',
+    estimatedHours: 200, durationLabel: '10 Weeks', status: 'published', certificateEnabled: true, createdDate: '2026-05-01',
+    objectives: ['Write idiomatic, object-oriented Python', 'Build REST APIs with Django REST Framework', 'Model and query relational data with PostgreSQL', 'Ship a deployed backend capstone project'],
+    prerequisites: ['Basic computer literacy', 'No prior programming experience required'],
+    timeline: { type: 'weeks', startDate: '2026-06-01', durationWeeks: 10, classDays: ['Mon', 'Tue', 'Wed', 'Thu'], dailyLearningHours: 2, scheduleMode: 'flexible', learningMode: 'instructor-led' },
+    weekAssignments: course.moduleOrder.map((moduleId, i) => ({ week: i * 2 + 1, moduleId })),
+    courseVersion: '1.0', defaultProgressionRules: { ...DEFAULT_PROGRESSION_RULES }, githubSettings: { ...DEFAULT_GITHUB_SETTINGS },
+  };
+
+  return { meta, course, moduleDefs, topicTests, moduleTests, assessments, miniTasks, majorProject, codingQuestions };
+}
+
 export function buildEmptyCourse(id: string, title: string, code: string): CourseContent {
   return {
     meta: {
@@ -146,12 +325,14 @@ function buildSeedMentors(): Mentor[] {
 function buildSeedRoster(): Pick<StoreShape, 'batches' | 'students' | 'enrollments' | 'questionBank'> {
   const batches: Batch[] = [
     { id: 'batch-mern-01', name: 'MERN-01 · Morning Batch', courseId: 'mern', startDate: '2026-04-01', endDate: '2026-09-30', scheduleDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], scheduleTime: '9:00 AM – 11:00 AM', mentorIds: ['mentor-ananya', 'mentor-vikram'], primaryMentorId: 'mentor-ananya', status: 'active' },
+    { id: 'batch-py-01', name: 'PY-01 · Evening Batch', courseId: 'python-backend', startDate: '2026-06-01', endDate: '2026-08-10', scheduleDays: ['Mon', 'Tue', 'Wed', 'Thu'], scheduleTime: '6:00 PM – 8:00 PM', mentorIds: ['mentor-vikram'], primaryMentorId: 'mentor-vikram', status: 'active' },
   ];
   const students: StudentRecord[] = [
     { id: 'student-demo', name: mockData.profile.name, email: 'rahul.sharma@example.com', courseId: 'mern', batchId: 'batch-mern-01', enrollmentDate: mockData.profile.joiningDate, status: 'active', isLiveDemoStudent: true, onboardingComplete: true },
     { id: 'student-2', name: 'Priya Nair', email: 'priya.nair@example.com', courseId: 'mern', batchId: 'batch-mern-01', enrollmentDate: '2026-04-01', status: 'active' },
     { id: 'student-3', name: 'Arjun Mehta', email: 'arjun.mehta@example.com', courseId: 'mern', batchId: 'batch-mern-01', enrollmentDate: '2026-04-02', status: 'active' },
     { id: 'student-4', name: 'Sana Iqbal', email: 'sana.iqbal@example.com', courseId: 'mern', batchId: 'batch-mern-01', enrollmentDate: '2026-04-03', status: 'paused' },
+    { id: 'student-5', name: 'Karan Verma', email: 'karan.verma@example.com', courseId: 'python-backend', batchId: 'batch-py-01', enrollmentDate: '2026-06-01', status: 'active' },
   ];
   const enrollments: Enrollment[] = students.map((s, i) => ({
     id: `enroll-${i + 1}`,
@@ -221,11 +402,35 @@ function buildSeedProgressRecords(): StudentProgress[] {
   const sana = createEmptyProgressState();
   sana.topics['html-t1'] = { contentViewed: true, testAttempts: [] };
 
+  // Karan (python-backend) — demonstrates the Changes Requested -> resubmit
+  // loop on a Mini Task, a scenario MERN's seed doesn't otherwise show.
+  const karan = createEmptyProgressState();
+  ['py-syntax', 'py-control-flow', 'py-oop', 'py-collections'].forEach((id) => {
+    karan.topics[id] = { contentViewed: true, testAttempts: [{ attemptNo: 1, answers: {}, scorePercent: 85, passed: true, date: '2026-06-20T09:00:00.000Z' }] };
+  });
+  karan.miniTasks['task-py-cli'] = {
+    status: 'Changes Requested',
+    versions: [
+      {
+        version: 1, githubUrl: 'https://github.com/karan-verma/python-backend-training', githubRepositoryName: 'karan-verma/python-backend-training',
+        githubBranch: 'feature/csv-cli', githubCommitSha: 'f4a9c21', liveUrl: '',
+        notes: 'Reads a CSV and prints row count and averages.', submittedAt: '2026-06-28T00:00:00.000Z',
+        evaluation: {
+          outcome: 'Changes Requested', evaluatedAt: '2026-06-29T00:00:00.000Z',
+          feedback: 'Good start, but the tool crashes with a stack trace when the file path is missing — wrap the file read in a try/except and print a clear error instead.',
+          criteria: [{ label: 'Code Quality', score: 7, maxScore: 10 }, { label: 'Functionality', score: 7, maxScore: 10 }, { label: 'Error Handling', score: 3, maxScore: 10 }],
+        },
+      },
+    ],
+  };
+  karan.notifications = [{ id: 'k-n1', message: 'Instructor requested changes on your Python CLI Tool submission.', date: '2026-06-29T00:00:00.000Z', kind: 'warning' }];
+
   return [
     demo,
     makeProgressRecord('student-2', 'mern', priya),
     makeProgressRecord('student-3', 'mern', arjun),
     makeProgressRecord('student-4', 'mern', sana),
+    makeProgressRecord('student-5', 'python-backend', karan),
   ];
 }
 
@@ -287,16 +492,18 @@ function buildSeedGithub(): Pick<StoreShape, 'githubConnections' | 'githubReposi
 
 function buildSeedState(): StoreShape {
   const mern = buildSeedMernCourse();
+  const python = buildSeedPythonCourse();
   const roster = buildSeedRoster();
   const github = buildSeedGithub();
   const certificates: CertificateConfig[] = [
     { courseId: 'mern', name: 'MERN Full Stack Development — Certificate of Completion', prefix: 'MERN-CERT', minAssessmentScorePercent: 60, requireAllModulesComplete: true, template: 'Standard' },
+    { courseId: 'python-backend', name: 'Python Backend Development — Certificate of Completion', prefix: 'PY-CERT', minAssessmentScorePercent: 60, requireAllModulesComplete: true, template: 'Standard' },
   ];
   const notificationRules: NotificationRule[] = DEFAULT_NOTIFICATION_EVENTS.map((e, i) => ({ id: `nr-${i}`, event: e.event, description: e.description, enabled: true }));
   return {
     schemaVersion: STORE_SCHEMA_VERSION,
     activeCourseId: 'mern',
-    courses: { mern },
+    courses: { mern, 'python-backend': python },
     ...roster,
     certificates,
     notificationRules,

@@ -58,7 +58,7 @@ const ProjectPage: React.FC = () => {
   }
 
   const completedCount = majorProject.milestones.filter((m) => progress.project.milestoneStatus[m.id] === 'completed').length;
-  const progressPercent = Math.round((completedCount / majorProject.milestones.length) * 100);
+  const progressPercent = majorProject.milestones.length === 0 ? 0 : Math.round((completedCount / majorProject.milestones.length) * 100);
   const currentMilestone = majorProject.milestones.find((m) => progress.project.milestoneStatus[m.id] === 'current');
   const allMilestonesDone = completedCount === majorProject.milestones.length;
 

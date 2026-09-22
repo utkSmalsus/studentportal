@@ -1,5 +1,46 @@
 # Coaching Center Platform — Architecture
 
+## Current Prototype Status
+
+Everything below section A was written as a pre-implementation proposal (see
+its closing line). What actually exists today, as an SPFx webpart under
+`src/webparts/studentPortal`:
+
+- **Frontend prototype is complete** for the workflows this document
+  describes as MVP/Phase 2: Student/Admin/Mentor portals, course/journey
+  authoring, Mini Task and Major Project submission-and-resubmission (with
+  full attempt history), Daily Coding, Assessments, Certificates, and a
+  multi-course (MERN + Python Backend) content model.
+- **The "Local/mock repository" IS the architecture right now, intentionally**
+  — not a stub. `admin/repository/store.ts` holds one in-memory `state`
+  object (persisted to `localStorage`), and every domain repository
+  (`courseRepository`, `progressRepository`, `submissionRepository`,
+  `projectSubmissionRepository`, `rosterRepository`, `mentorRepository`,
+  `githubRepository`, `questionBankRepository`, ...) reads/writes it. No
+  other file touches `localStorage` directly, which is what keeps this layer
+  swappable.
+- **Backend is NOT implemented.** Section K.0's SharePoint Lists + Graph API
+  design, section L's REST API, and section M's `backend/`/`frontend/`
+  folder split are still the plan, not the codebase — everything currently
+  lives client-side under `src/webparts/studentPortal`, with no server.
+  SharePoint/Graph will replace the repository layer's *implementation*
+  later; the Engine/Presentation layers (section A) and the repository
+  function signatures they call are designed not to need to change when
+  that happens.
+- **Authentication/RBAC is currently demo/local** — no Entra ID, no real
+  login; the "logged-in student" is a single demo `StudentRecord` the portal
+  points `AppStateProvider` at, and Admin/Mentor portals are reached by an
+  in-app mode switch, not a real role check.
+- **GitHub integration is currently mock/local** (`admin/repository/githubRepository.ts`)
+  — connect/repository/commit/PR data is simulated in the same local store,
+  never a real GitHub API call. Mini Task and Major Project submissions
+  capture repository/branch/commit SHA/PR as manually-supplied evidence, not
+  verified against a real repository.
+- **No production security claims are being made anywhere in this build.**
+- The current purpose of this codebase is **functional UX/workflow
+  validation** — proving the student/admin/mentor journeys work end to end
+  on realistic data — ahead of the backend build this document plans for.
+
 ## A. Product Architecture
 
 Three layers, cleanly separated:
@@ -167,7 +208,7 @@ Backend organized by **domain module**, not by MVC layer — each module owns it
 
 **MVP**: Course/Journey builder (no drag-and-drop, simple up/down reorder), Module/Topic content, Batch+Enrollment, single manual Mini Task evaluation flow, Question Bank + Daily Schedule + auto-graded coding, basic Assessments (MCQ/TF), Progress % (simple average, weighted-ready), Student Dashboard + Journey view, Admin Dashboard basics, Certificate PDF on completion, file uploads via storage abstraction (local disk adapter first, S3 later).
 
-**Phase 2**: Major Project + Milestones, drag-and-drop journey builder, resubmission workflows, reporting suite, gamification (streaks/badges), bulk admin operations.
+**Phase 2**: drag-and-drop journey builder, reporting suite, gamification (streaks/badges), bulk admin operations. (Major Project + Milestones and resubmission workflows, both originally scoped here, are already built in the current prototype — see "Current Prototype Status" above.)
 
 **Future**: Multiple instructors per batch, weighted progress config, adaptive daily-coding difficulty, plagiarism checks, SSO/OAuth, mobile app, analytics on "hardest questions."
 

@@ -1,13 +1,19 @@
 import * as React from 'react';
 import { useState } from 'react';
 import { PageHeader, Card, SectionTitle, SecondaryButton } from '../../ui/Primitives';
-import { FormField, FormSection, TextInput, TextArea, Select } from '../ui/AdminPrimitives';
+import { FormField, FormSection, TextInput, TextArea, Select, ConfirmDialog } from '../ui/AdminPrimitives';
 import { PlusIcon, TrashIcon } from '../../ui/icons';
 import * as courseRepo from '../repository/courseRepository';
 import * as contentRepo from '../repository/contentRepository';
 import { MilestoneDef } from '../../data/types';
 
-const MilestoneCard: React.FC<{ courseId: string; milestone: MilestoneDef; index: number; total: number }> = ({ courseId, milestone, index, total }) => (
+const MilestoneCard: React.FC<{ courseId: string; milestone: MilestoneDef; index: number; total: number; onRequestDelete: (m: MilestoneDef) => void }> = ({
+  courseId,
+  milestone,
+  index,
+  total,
+  onRequestDelete,
+}) => (
   <Card>
     <div className="flex items-center justify-between mb-3">
       <span className="text-xs font-bold text-slate-400">Milestone {index + 1}</span>
@@ -18,7 +24,7 @@ const MilestoneCard: React.FC<{ courseId: string; milestone: MilestoneDef; index
         <button disabled={index === total - 1} onClick={() => contentRepo.reorderMilestone(courseId, milestone.id, 'down')} className="text-slate-300 hover:text-slate-600 disabled:opacity-30">
           ↓
         </button>
-        <button onClick={() => contentRepo.deleteMilestone(courseId, milestone.id)} className="text-slate-300 hover:text-red-500">
+        <button onClick={() => onRequestDelete(milestone)} className="text-slate-300 hover:text-red-500">
           <TrashIcon className="w-4 h-4" />
         </button>
       </div>
@@ -42,6 +48,7 @@ const MilestoneCard: React.FC<{ courseId: string; milestone: MilestoneDef; index
 const MajorProjectAdminPage: React.FC = () => {
   const courses = courseRepo.listCourses();
   const [courseId, setCourseId] = useState(courses[0]?.id || '');
+  const [deleteTarget, setDeleteTarget] = useState<MilestoneDef | undefined>();
   const content = courseRepo.getCourseContent(courseId);
 
   if (!content) return null;
@@ -137,9 +144,22 @@ const MajorProjectAdminPage: React.FC = () => {
       </SectionTitle>
       <div className="space-y-3 max-w-2xl">
         {project.milestones.map((m, i) => (
-          <MilestoneCard key={m.id} courseId={courseId} milestone={m} index={i} total={project.milestones.length} />
+          <MilestoneCard key={m.id} courseId={courseId} milestone={m} index={i} total={project.milestones.length} onRequestDelete={setDeleteTarget} />
         ))}
       </div>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title={`Delete "${deleteTarget?.title}"?`}
+        description="Students partway through this milestone will lose their marked-complete status for it."
+        confirmLabel="Delete"
+        danger
+        onConfirm={() => {
+          if (deleteTarget) contentRepo.deleteMilestone(courseId, deleteTarget.id);
+          setDeleteTarget(undefined);
+        }}
+        onCancel={() => setDeleteTarget(undefined)}
+      />
     </div>
   );
 };
