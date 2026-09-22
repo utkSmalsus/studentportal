@@ -48,7 +48,7 @@ export function createEmptyProgressState(): StudentProgressState {
     miniTasks: {},
     moduleTests: {},
     assessments: {},
-    project: { milestoneStatus: {} },
+    project: { milestoneStatus: {}, status: 'Not Started', versions: [] },
     notifications: [],
   };
 }
@@ -150,6 +150,8 @@ export function createInitialProgressState(): StudentProgressState {
         m1: 'completed', m2: 'completed', m3: 'completed', m4: 'completed',
         m5: 'current', m6: 'upcoming', m7: 'upcoming', m8: 'upcoming',
       },
+      status: 'Not Started',
+      versions: [],
     },
     notifications: [
       { id: 'n1', message: 'Instructor requested changes on your Node CLI Tool submission.', date: daysAgo(1), kind: 'warning' },

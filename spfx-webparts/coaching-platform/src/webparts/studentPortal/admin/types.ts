@@ -184,30 +184,11 @@ export interface Enrollment {
   status: EnrollmentStatus;
 }
 
-export type EvaluationKind = 'miniTask' | 'project';
+// Shared by both Mini Task and Major Project evaluation queues/rows — see
+// admin/repository/submissionRepository.ts and projectSubmissionRepository.ts,
+// which now derive every queue row from real per-student StudentProgress
+// instead of a roster-wide mock queue.
 export type EvaluationStatus = 'Under Review' | 'Changes Requested' | 'Passed';
-
-// A queue row for the roster (non-live) students. The live demo student's
-// evaluation queue entries are derived directly from AppStateContext instead —
-// see admin/repository/evaluationRepository.ts.
-export interface RosterEvaluationItem {
-  id: string;
-  kind: EvaluationKind;
-  studentId: string;
-  courseId: string;
-  moduleId: string;
-  title: string;
-  submittedAt: string;
-  status: EvaluationStatus;
-  attempt: number;
-  githubUrl?: string;
-  githubBranch?: string;
-  githubCommitSha?: string;
-  githubPullRequestUrl?: string;
-  liveUrl?: string;
-  notes?: string;
-  feedback?: string;
-}
 
 export interface ValidationIssue {
   severity: 'error' | 'warning';

@@ -18,21 +18,28 @@ const MyStudentsPage: React.FC<{ mentorId: string; onNavigate: (r: MentorRoute) 
 
   const students = statusFilter ? allStudents.filter((s) => s.status === statusFilter) : allStudents;
 
+  // Fetched once per student, not once per column — each cell below is a
+  // cheap lookup into this instead of its own getStudentProgressView call.
+  const viewByStudentId: Record<string, ReturnType<typeof getStudentProgressView>> = {};
+  allStudents.forEach((s) => {
+    viewByStudentId[s.id] = getStudentProgressView(s.id, s.courseId);
+  });
+
   const columns: AdminColumn<StudentRecord>[] = [
     { key: 'name', label: 'Student', render: (s) => <span className="font-semibold text-slate-900">{s.name}</span> },
     { key: 'course', label: 'Course', render: (s) => courses.find((c) => c.id === s.courseId)?.title || '—' },
-    { key: 'progress', label: 'Progress', render: (s) => `${getStudentProgressView(s.id, s.courseId)?.overallPercent ?? 0}%` },
-    { key: 'module', label: 'Current Module', render: (s) => getStudentProgressView(s.id, s.courseId)?.currentModuleTitle || '—' },
+    { key: 'progress', label: 'Progress', render: (s) => `${viewByStudentId[s.id]?.overallPercent ?? 0}%` },
+    { key: 'module', label: 'Current Module', render: (s) => viewByStudentId[s.id]?.currentModuleTitle || '—' },
     {
       key: 'dailyCoding',
       label: 'Daily Coding',
-      render: (s) => `${getStudentProgressView(s.id, s.courseId)?.progress.codingStreak.current ?? 0}-day streak`,
+      render: (s) => `${viewByStudentId[s.id]?.progress.codingStreak.current ?? 0}-day streak`,
     },
     {
       key: 'miniTasks',
       label: 'Mini Tasks',
       render: (s) => {
-        const progress = getStudentProgressView(s.id, s.courseId)?.progress;
+        const progress = viewByStudentId[s.id]?.progress;
         return progress ? Object.keys(progress.miniTasks).filter((id) => progress.miniTasks[id].status === 'Passed').length : 0;
       },
     },

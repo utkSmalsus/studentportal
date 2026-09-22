@@ -5,36 +5,42 @@ import { UsersIcon, BookIcon, BuildingIcon, ClipboardIcon, ChartIcon, AwardIcon,
 import * as courseRepo from '../repository/courseRepository';
 import * as rosterRepo from '../repository/rosterRepository';
 import * as submissionRepo from '../repository/submissionRepository';
+import * as projectSubmissionRepo from '../repository/projectSubmissionRepository';
 import { getStudentProgressView } from '../repository/progressView';
 
 const AdminDashboardPage: React.FC<{ onNavigate: (r: AdminRoute) => void }> = ({ onNavigate }) => {
   const courses = courseRepo.listCourses();
   const students = rosterRepo.listStudents();
   const batches = rosterRepo.listBatches();
-  const rosterEvals = rosterRepo.listRosterEvaluations();
 
-  // Real per-student data across the whole roster, each scored against their
-  // OWN course — never a single "active" student's state.
-  const views = students.map((s) => ({ student: s, view: getStudentProgressView(s.id, s.courseId) })).filter((v) => v.view);
+  // One pass over the roster computing everything per-student — each scored
+  // against their OWN course, never a single "active" student's state, and
+  // never re-fetched per metric.
+  const rows = students
+    .map((student) => ({
+      student,
+      view: getStudentProgressView(student.id, student.courseId),
+      pendingMiniTasks: submissionRepo.listPendingSubmissions([student.id], student.courseId).length,
+      pendingProjects: projectSubmissionRepo.listPendingProjectSubmissions([student.id], student.courseId).length,
+    }))
+    .filter((r) => r.view);
 
-  const pendingMiniTasks = students.reduce((sum, s) => sum + submissionRepo.listPendingSubmissions([s.id], s.courseId).length, 0);
-  const pendingProjects = rosterEvals.filter((e) => e.kind === 'project' && e.status === 'Under Review').length;
+  const pendingMiniTasks = rows.reduce((sum, r) => sum + r.pendingMiniTasks, 0);
+  const pendingProjects = rows.reduce((sum, r) => sum + r.pendingProjects, 0);
 
-  const assessmentsCompleted = views.reduce((sum, { view }) => sum + Object.keys(view!.progress.assessments).filter((id) => view!.progress.assessments[id].attempts.length > 0).length, 0);
-  const overallProgress = views.length > 0 ? Math.round(views.reduce((sum, { view }) => sum + view!.overallPercent, 0) / views.length) : 0;
+  const assessmentsCompleted = rows.reduce((sum, { view }) => sum + Object.keys(view!.progress.assessments).filter((id) => view!.progress.assessments[id].attempts.length > 0).length, 0);
+  const overallProgress = rows.length > 0 ? Math.round(rows.reduce((sum, { view }) => sum + view!.overallPercent, 0) / rows.length) : 0;
 
   const activeCourses = courses.filter((c) => c.status === 'published').length;
   const activeBatches = batches.filter((b) => b.status === 'active').length;
 
   const behindStudents = students.filter((s) => s.status === 'paused').length;
 
-  const recentActivity = [
-    ...views.reduce<{ id: string; message: string; date: string }[]>(
-      (rows, { student, view }) => rows.concat(view!.progress.notifications.slice(0, 2).map((n) => ({ id: n.id, message: `${student.name}: ${n.message}`, date: n.date }))),
+  const recentActivity = rows
+    .reduce<{ id: string; message: string; date: string }[]>(
+      (all, { student, view }) => all.concat(view!.progress.notifications.slice(0, 2).map((n) => ({ id: n.id, message: `${student.name}: ${n.message}`, date: n.date }))),
       []
-    ),
-    ...rosterEvals.slice(0, 3).map((e) => ({ id: e.id, message: `${students.find((s) => s.id === e.studentId)?.name || 'Student'} submitted "${e.title}"`, date: e.submittedAt })),
-  ]
+    )
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 6);
 

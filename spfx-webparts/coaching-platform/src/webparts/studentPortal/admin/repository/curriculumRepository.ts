@@ -15,7 +15,7 @@ export function getModule(courseId: string, moduleId: string): ModuleDef | undef
 export function createModule(courseId: string, input: { title: string; group: ModuleGroup; estimatedDuration: string; prerequisiteModuleId?: string }): ModuleDef | undefined {
   const c = content(courseId);
   if (!c) return undefined;
-  const id = `${courseId}-mod-${Date.now().toString(36)}`;
+  const id = `${courseId}-mod-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
   const module: ModuleDef = {
     id,
     courseId,
@@ -109,7 +109,7 @@ export function createTopic(courseId: string, moduleId: string, input: { title: 
   const c = content(courseId);
   const m = getModule(courseId, moduleId);
   if (!c || !m) return undefined;
-  const id = `${moduleId}-t${m.topics.length + 1}-${Date.now().toString(36)}`;
+  const id = `${moduleId}-t${m.topics.length + 1}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
   const test: TopicTestDef = {
     id: `${id}-test`,
     courseId,

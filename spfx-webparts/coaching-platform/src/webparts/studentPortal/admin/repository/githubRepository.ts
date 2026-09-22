@@ -23,7 +23,7 @@ export function getConnection(studentId: string): GitHubConnection | undefined {
 export function connectAccount(studentId: string, username: string): GitHubConnection {
   const existing = state.githubConnections.find((c) => c.studentId === studentId);
   const connection: GitHubConnection = {
-    id: existing?.id || `ghc-${Date.now().toString(36)}`,
+    id: existing?.id || `ghc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
     studentId,
     githubUserId: existing?.githubUserId || `gh-${Math.floor(Math.random() * 100000)}`,
     username,
@@ -71,7 +71,7 @@ export function createRepository(studentId: string, courseId: string, name: stri
   const owner = connection.username;
   const snapshot = seedSnapshot(owner, name);
   const link: GitHubRepositoryLink = {
-    id: `ghl-${Date.now().toString(36)}`,
+    id: `ghl-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
     studentId,
     courseId,
     repositoryId: `${owner}/${name}`,
@@ -93,7 +93,7 @@ export function linkExistingRepository(studentId: string, courseId: string, repo
   const [owner, name] = repositoryName.split('/');
   if (!state.githubRepoSnapshots[repositoryName]) seedSnapshot(owner, name);
   const link: GitHubRepositoryLink = {
-    id: `ghl-${Date.now().toString(36)}`,
+    id: `ghl-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
     studentId,
     courseId,
     repositoryId: repositoryName,

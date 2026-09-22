@@ -91,16 +91,37 @@ export interface AssessmentProgressEntry {
 
 export type MilestoneStatus = 'completed' | 'current' | 'upcoming';
 
-export interface ProjectSubmission {
+export interface ProjectEvaluation {
+  criteria: { label: string; score: number; maxScore: number }[];
+  feedback: string;
+  outcome: 'Passed' | 'Changes Requested';
+  evaluatedAt: string;
+}
+
+// One final-submission attempt, mirroring MiniTaskSubmissionVersion — the
+// Major Project's final deliverable now follows the exact same versioned
+// submit/evaluate shape as a Mini Task, instead of a single unversioned
+// `submission` field with no evaluation slot of its own.
+export interface ProjectSubmissionVersion {
+  version: number;
   githubUrl: string;
+  repositoryName?: string;
+  branch?: string;
+  commitSha?: string;
+  pullRequestUrl?: string;
   liveUrl: string;
   documentationUrl: string;
   submittedAt: string;
+  evaluation?: ProjectEvaluation;
 }
 
+// Milestone progress (the student's own step-by-step tracker) stays fully
+// separate from submission/evaluation state (the mentor-facing final review) —
+// completing every milestone never implies a passed, or even submitted, project.
 export interface ProjectProgressState {
   milestoneStatus: Record<string, MilestoneStatus>;
-  submission?: ProjectSubmission;
+  status: MiniTaskStatus;
+  versions: ProjectSubmissionVersion[];
 }
 
 export interface NotificationItem {

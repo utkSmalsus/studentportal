@@ -4,7 +4,7 @@
 // and an admin/mentor acting on ANY student's record (via progressRepository's
 // dispatch()). Moving this out of AppStateContext is what makes "evaluate
 // this OTHER student's mini task" possible without a second live React tree.
-import { StudentProgressState, NotificationItem, MiniTaskSubmissionVersion, QuizAttemptRecord, MiniTaskEvaluation } from './types';
+import { StudentProgressState, NotificationItem, MiniTaskSubmissionVersion, QuizAttemptRecord, MiniTaskEvaluation, ProjectSubmissionVersion, ProjectEvaluation } from './types';
 import { evaluateCodingSubmission } from './engine/codingEvaluator';
 import { scoreAssessmentAttempt, AssessmentScoreResult } from './engine/assessmentEngine';
 import { scoreQuiz } from './engine/quizEngine';
@@ -34,7 +34,8 @@ export type ProgressAction =
   | { type: 'ADMIN_EVALUATE_MINI_TASK'; taskId: string; version: number; evaluation: MiniTaskEvaluation }
   | { type: 'RECORD_ASSESSMENT_ATTEMPT'; assessmentId: string; answers: Record<string, number> }
   | { type: 'ADVANCE_MILESTONE'; milestoneId: string; nextMilestoneId?: string }
-  | { type: 'SUBMIT_PROJECT'; githubUrl: string; liveUrl: string; documentationUrl: string };
+  | { type: 'SUBMIT_PROJECT'; githubUrl: string; liveUrl: string; documentationUrl: string }
+  | { type: 'ADMIN_EVALUATE_PROJECT'; version: number; evaluation: ProjectEvaluation };
 
 export function pushNotification(list: NotificationItem[], message: string, kind: NotificationItem['kind']): NotificationItem[] {
   const item: NotificationItem = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, message, date: new Date().toISOString(), kind };
@@ -182,15 +183,32 @@ export function progressReducer(state: StudentProgressState, action: ProgressAct
     }
 
     case 'SUBMIT_PROJECT': {
+      const version: ProjectSubmissionVersion = {
+        version: state.project.versions.length + 1,
+        githubUrl: action.githubUrl,
+        liveUrl: action.liveUrl,
+        documentationUrl: action.documentationUrl,
+        submittedAt: new Date().toISOString(),
+      };
       const notifications = pushNotification(state.notifications, 'Major Project submitted for final review.', 'success');
       return {
         ...state,
-        project: {
-          ...state.project,
-          submission: { githubUrl: action.githubUrl, liveUrl: action.liveUrl, documentationUrl: action.documentationUrl, submittedAt: new Date().toISOString() },
-        },
+        project: { ...state.project, status: 'Under Review', versions: [...state.project.versions, version] },
         notifications,
       };
+    }
+
+    case 'ADMIN_EVALUATE_PROJECT': {
+      const entry = state.project;
+      const versionIndex = entry.versions.findIndex((v) => v.version === action.version);
+      if (versionIndex === -1) return state;
+      const versions = entry.versions.map((v, i) => (i === versionIndex ? { ...v, evaluation: action.evaluation } : v));
+      const notifications = pushNotification(
+        state.notifications,
+        action.evaluation.outcome === 'Passed' ? 'Major Project passed final review.' : 'Instructor requested changes on your Major Project.',
+        action.evaluation.outcome === 'Passed' ? 'success' : 'warning'
+      );
+      return { ...state, project: { ...state.project, status: action.evaluation.outcome, versions }, notifications };
     }
 
     default:

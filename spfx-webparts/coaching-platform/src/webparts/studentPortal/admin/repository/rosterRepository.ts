@@ -1,22 +1,22 @@
-// Batches, Students, Enrollments and the (non-live) roster evaluation queue.
+// Batches, Students and Enrollments.
 //
-// Only ONE student in this demo has a real, live progress state — the one
-// driving AppStateContext (see state/AppStateContext.tsx), flagged
-// `isLiveDemoStudent` on its StudentRecord. Every other roster row is
-// realistic seed data with no backing student session (this SPFx demo has no
-// multi-user login), so their "evaluation" actions update their own static
-// record here rather than a live app-state. Evaluating the live demo
-// student's mini tasks goes through AppStateContext directly (see
-// EvaluationQueuePage), not through this file, so that it is genuinely live.
+// Only ONE student in this demo drives a live, rendered React tree at a time —
+// the one flagged `isLiveDemoStudent` on its StudentRecord (this SPFx demo has
+// no multi-user login). That flag only matters for session-level concerns like
+// "Preview as Student" (components/AppRoot.tsx) and enrollment switching the
+// active course mirror (below). It has no bearing on progress DATA: every
+// roster student, live or not, has a real StudentProgress record — see
+// admin/repository/progressRepository.ts — so admin/mentor analytics never
+// need to special-case the live student.
 import { state, commit } from './store';
-import { Batch, StudentRecord, Enrollment, RosterEvaluationItem, EvaluationStatus } from '../types';
+import { Batch, StudentRecord, Enrollment } from '../types';
 
 export function listBatches(): Batch[] {
   return state.batches;
 }
 
 export function createBatch(input: Omit<Batch, 'id'>): Batch {
-  const batch: Batch = { ...input, id: `batch-${Date.now().toString(36)}` };
+  const batch: Batch = { ...input, id: `batch-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}` };
   state.batches.push(batch);
   commit();
   return batch;
@@ -57,7 +57,7 @@ export function listEnrollments(): Enrollment[] {
 // switches the app's active course — which is what actually makes "Student
 // sees the new course" true end to end (see store.ts's commit()/sync).
 export function enrollStudent(input: { studentId: string; courseId: string; batchId?: string; startDate: string; expectedCompletion: string }): Enrollment {
-  const enrollment: Enrollment = { ...input, id: `enroll-${Date.now().toString(36)}`, status: 'active' };
+  const enrollment: Enrollment = { ...input, id: `enroll-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, status: 'active' };
   state.enrollments.push(enrollment);
   const student = getStudent(input.studentId);
   const isLive = !!student?.isLiveDemoStudent;
@@ -73,22 +73,8 @@ export function enrollStudent(input: { studentId: string; courseId: string; batc
 }
 
 export function createStudent(input: Omit<StudentRecord, 'id'>): StudentRecord {
-  const student: StudentRecord = { ...input, id: `student-${Date.now().toString(36)}` };
+  const student: StudentRecord = { ...input, id: `student-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}` };
   state.students.push(student);
   commit();
   return student;
-}
-
-// ---- Roster (non-live) evaluation queue ----
-
-export function listRosterEvaluations(): RosterEvaluationItem[] {
-  return state.rosterEvaluations;
-}
-
-export function submitRosterEvaluation(itemId: string, outcome: EvaluationStatus, feedback: string): void {
-  const item = state.rosterEvaluations.find((r) => r.id === itemId);
-  if (!item) return;
-  item.status = outcome;
-  item.feedback = feedback;
-  commit();
 }

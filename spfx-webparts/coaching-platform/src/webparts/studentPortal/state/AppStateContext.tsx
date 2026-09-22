@@ -9,7 +9,7 @@
 // state/progressReducer.ts and admin/repository/progressRepository.ts.
 import * as React from 'react';
 import { createContext, useCallback, useContext, useMemo } from 'react';
-import { StudentProgressState, MiniTaskEvaluation } from './types';
+import { StudentProgressState } from './types';
 import * as progressRepository from '../admin/repository/progressRepository';
 import * as rosterRepository from '../admin/repository/rosterRepository';
 import { useAdminStoreVersion } from '../admin/hooks';
@@ -27,7 +27,6 @@ interface AppStateContextValue {
   completePractice: (practiceId: string) => void;
   submitCoding: (questionId: string, code: string) => void;
   submitMiniTask: (taskId: string, githubUrl: string, liveUrl: string, notes: string, github?: { repositoryName?: string; branch?: string; commitSha?: string; pullRequestUrl?: string }) => void;
-  adminEvaluateMiniTask: (taskId: string, version: number, evaluation: MiniTaskEvaluation) => void;
   submitAssessment: (assessmentId: string, answers: Record<string, number>) => void;
   advanceMilestone: (milestoneId: string, nextMilestoneId?: string) => void;
   submitProject: (githubUrl: string, liveUrl: string, documentationUrl: string) => void;
@@ -54,18 +53,16 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode; studentId?:
   const submitMiniTask = useCallback(
     (taskId: string, githubUrl: string, liveUrl: string, notes: string, github?: { repositoryName?: string; branch?: string; commitSha?: string; pullRequestUrl?: string }) => {
       // A submission now waits for a real Mentor Portal review (see
-      // mentor/pages/MentorReviewPage.tsx / adminEvaluateMiniTask) instead of
-      // resolving itself — GitHub activity is evidence, not completion, and only
-      // a mentor's evaluation decides Passed vs Changes Requested.
+      // mentor/pages/MentorReviewPage.tsx, via submissionRepository — never
+      // this context, since evaluating is admin/mentor logic, not the
+      // logged-in student's own action) instead of resolving itself — GitHub
+      // activity is evidence, not completion, and only a mentor's evaluation
+      // decides Passed vs Changes Requested.
       if (courseId) progressRepository.dispatch(studentId, courseId, { type: 'SUBMIT_MINI_TASK', taskId, githubUrl, liveUrl, notes, github });
     },
     [studentId, courseId]
   );
 
-  const adminEvaluateMiniTask = useCallback(
-    (taskId: string, version: number, evaluation: MiniTaskEvaluation) => { if (courseId) progressRepository.dispatch(studentId, courseId, { type: 'ADMIN_EVALUATE_MINI_TASK', taskId, version, evaluation }); },
-    [studentId, courseId]
-  );
   const submitAssessment = useCallback((assessmentId: string, answers: Record<string, number>) => { if (courseId) progressRepository.dispatch(studentId, courseId, { type: 'RECORD_ASSESSMENT_ATTEMPT', assessmentId, answers }); }, [studentId, courseId]);
   const advanceMilestone = useCallback((milestoneId: string, nextMilestoneId?: string) => { if (courseId) progressRepository.dispatch(studentId, courseId, { type: 'ADVANCE_MILESTONE', milestoneId, nextMilestoneId }); }, [studentId, courseId]);
   const submitProject = useCallback((githubUrl: string, liveUrl: string, documentationUrl: string) => { if (courseId) progressRepository.dispatch(studentId, courseId, { type: 'SUBMIT_PROJECT', githubUrl, liveUrl, documentationUrl }); }, [studentId, courseId]);
@@ -82,12 +79,11 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode; studentId?:
       completePractice,
       submitCoding,
       submitMiniTask,
-      adminEvaluateMiniTask,
       submitAssessment,
       advanceMilestone,
       submitProject,
     };
-  }, [progress, studentId, courseId, markTopicViewed, submitTopicTest, submitModuleTest, completePractice, submitCoding, submitMiniTask, adminEvaluateMiniTask, submitAssessment, advanceMilestone, submitProject]);
+  }, [progress, studentId, courseId, markTopicViewed, submitTopicTest, submitModuleTest, completePractice, submitCoding, submitMiniTask, submitAssessment, advanceMilestone, submitProject]);
 
   if (!value) return null;
 

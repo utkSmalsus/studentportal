@@ -17,15 +17,20 @@ const CertificatesAdminPage: React.FC = () => {
 
   const enrolledStudents = rosterRepo.listStudents().filter((s) => s.courseId === courseId);
 
+  // Fetched once per student, not once per column/render.
+  const viewByStudentId: Record<string, ReturnType<typeof getStudentProgressView>> = {};
+  enrolledStudents.forEach((s) => {
+    viewByStudentId[s.id] = getStudentProgressView(s.id, s.courseId);
+  });
   const isEligible = (s: StudentRecord): boolean => {
-    const view = getStudentProgressView(s.id, s.courseId);
+    const view = viewByStudentId[s.id];
     if (!view) return false;
     return cert.requireAllModulesComplete ? view.currentModuleTitle === 'Complete' : view.overallPercent >= 100;
   };
 
   const columns: AdminColumn<StudentRecord>[] = [
     { key: 'name', label: 'Student', render: (s) => s.name },
-    { key: 'progress', label: 'Progress', render: (s) => `${getStudentProgressView(s.id, s.courseId)?.overallPercent ?? 0}%` },
+    { key: 'progress', label: 'Progress', render: (s) => `${viewByStudentId[s.id]?.overallPercent ?? 0}%` },
     {
       key: 'eligible',
       label: 'Eligibility',

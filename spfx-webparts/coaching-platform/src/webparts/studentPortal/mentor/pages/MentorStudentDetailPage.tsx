@@ -5,6 +5,7 @@ import * as mentorRepo from '../../admin/repository/mentorRepository';
 import * as courseRepo from '../../admin/repository/courseRepository';
 import * as githubRepo from '../../admin/repository/githubRepository';
 import { getStudentProgressView } from '../../admin/repository/progressView';
+import * as submissionRepo from '../../admin/repository/submissionRepository';
 import * as progression from '../../state/engine/progression';
 
 const MentorStudentDetailPage: React.FC<{ mentorId: string; studentId: string; onNavigate: (r: MentorRoute) => void }> = ({ mentorId, studentId, onNavigate }) => {
@@ -14,6 +15,13 @@ const MentorStudentDetailPage: React.FC<{ mentorId: string; studentId: string; o
   if (!student) return <EmptyState title="Student not found or not assigned to you" />;
 
   const view = getStudentProgressView(studentId, student.courseId);
+  // One row per task, the latest attempt only — mirrors what
+  // submissionRepository.listPendingSubmissions already does for queues.
+  type MiniTaskSubmission = ReturnType<typeof submissionRepo.listSubmissionsForStudent>[number];
+  const latestMiniTaskByTaskId = submissionRepo.listSubmissionsForStudent(studentId, student.courseId).reduce<Record<string, MiniTaskSubmission>>((byTask, sub) => {
+    if (!byTask[sub.taskId] || sub.attempt > byTask[sub.taskId].attempt) byTask[sub.taskId] = sub;
+    return byTask;
+  }, {});
   const connection = githubRepo.getConnection(studentId);
   const repoLink = githubRepo.getRepositoryLink(studentId, student.courseId);
   const snapshot = repoLink ? githubRepo.getRepository(repoLink.owner, repoLink.repositoryName.split('/')[1]) : undefined;
@@ -76,17 +84,16 @@ const MentorStudentDetailPage: React.FC<{ mentorId: string; studentId: string; o
             <Card>
               <SectionTitle>Mini Tasks</SectionTitle>
               <ul className="space-y-2 text-sm">
-                {Object.keys(view.progress.miniTasks).map((taskId) => {
+                {Object.keys(latestMiniTaskByTaskId).map((taskId) => {
+                  const sub = latestMiniTaskByTaskId[taskId];
                   const task = view.content.miniTasks.find((t) => t.id === taskId);
-                  const entry = view.progress.miniTasks[taskId];
-                  if (!task || entry.status === 'Not Started') return null;
-                  const latest = entry.versions[entry.versions.length - 1];
+                  if (!task) return null;
                   return (
-                    <li key={taskId} className="flex items-center justify-between">
+                    <li key={sub.id} className="flex items-center justify-between">
                       <span className="text-slate-700">{task.title}</span>
                       <span className="flex items-center gap-2">
-                        {latest?.evaluation && <span className="text-slate-400">{latest.evaluation.criteria.reduce((s, c) => s + c.score, 0)} pts</span>}
-                        <StatusPill color={entry.status === 'Passed' ? 'green' : entry.status === 'Changes Requested' ? 'amber' : 'blue'}>{entry.status}</StatusPill>
+                        {sub.evaluation && <span className="text-slate-400">{sub.evaluation.criteria.reduce((s, c) => s + c.score, 0)} pts</span>}
+                        <StatusPill color={sub.status === 'Passed' ? 'green' : sub.status === 'Changes Requested' ? 'amber' : 'blue'}>{sub.status}</StatusPill>
                       </span>
                     </li>
                   );

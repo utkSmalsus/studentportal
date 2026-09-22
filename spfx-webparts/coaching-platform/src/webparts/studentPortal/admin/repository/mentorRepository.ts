@@ -5,6 +5,7 @@ import { state, commit } from './store';
 import { Mentor, MentorStatus, Batch, StudentRecord } from '../types';
 import { assertMentorExists } from './validation';
 import * as submissionRepository from './submissionRepository';
+import * as projectSubmissionRepository from './projectSubmissionRepository';
 
 export function listMentors(): Mentor[] {
   return state.mentors;
@@ -15,7 +16,7 @@ export function getMentor(id: string): Mentor | undefined {
 }
 
 export function createMentor(input: Omit<Mentor, 'id'>): Mentor {
-  const mentor: Mentor = { ...input, id: `mentor-${Date.now().toString(36)}` };
+  const mentor: Mentor = { ...input, id: `mentor-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}` };
   state.mentors.push(mentor);
   commit();
   return mentor;
@@ -59,14 +60,12 @@ export function isStudentAssignedToMentor(mentorId: string, studentId: string): 
   return getStudentsForMentor(mentorId).some((s) => s.id === studentId);
 }
 
-// Real per-student mini task submissions (own course, own progress record)
-// plus the roster's still-mock Major Project review rows — see
-// admin/repository/submissionRepository.ts for why mini tasks moved off
-// rosterEvaluations and project reviews haven't (yet).
+// Real per-student Mini Task and Major Project submissions — both are now
+// scoped to studentId+courseId via submissionRepository/projectSubmissionRepository,
+// so this counts genuine pending work, never a mock roster-wide queue.
 export function getPendingReviewCountForMentor(mentorId: string): number {
   const myStudents = getStudentsForMentor(mentorId);
-  const studentIds = myStudents.map((s) => s.id);
   const miniTaskCount = myStudents.reduce((sum, s) => sum + submissionRepository.listPendingSubmissions([s.id], s.courseId).length, 0);
-  const projectCount = state.rosterEvaluations.filter((e) => e.kind === 'project' && studentIds.indexOf(e.studentId) !== -1 && e.status === 'Under Review').length;
+  const projectCount = myStudents.reduce((sum, s) => sum + projectSubmissionRepository.listPendingProjectSubmissions([s.id], s.courseId).length, 0);
   return miniTaskCount + projectCount;
 }

@@ -16,7 +16,7 @@
 // the only change needed — nothing above the repository layer should notice.
 import * as mockData from '../../data/mockData';
 import {
-  CourseContent, CourseMeta, BankQuestion, Batch, StudentRecord, Enrollment, RosterEvaluationItem,
+  CourseContent, CourseMeta, BankQuestion, Batch, StudentRecord, Enrollment,
   DEFAULT_TIMELINE, DEFAULT_PROGRESSION_RULES, DEFAULT_GITHUB_SETTINGS, CertificateConfig, NotificationRule,
   Mentor, GitHubConnection, GitHubRepositoryLink, GitHubActivityItem, GitHubRepositorySnapshot,
 } from '../types';
@@ -24,7 +24,7 @@ import { StudentProgress } from '../../state/types';
 import { createInitialProgressState, createEmptyProgressState } from '../../state/initialState';
 
 const STORAGE_KEY = 'coachingPlatform.adminStore.v1';
-const STORE_SCHEMA_VERSION = 3;
+const STORE_SCHEMA_VERSION = 4;
 
 export interface StoreShape {
   schemaVersion: number;
@@ -34,7 +34,6 @@ export interface StoreShape {
   batches: Batch[];
   students: StudentRecord[];
   enrollments: Enrollment[];
-  rosterEvaluations: RosterEvaluationItem[];
   certificates: CertificateConfig[];
   notificationRules: NotificationRule[];
   mentors: Mentor[];
@@ -144,7 +143,7 @@ function buildSeedMentors(): Mentor[] {
   ];
 }
 
-function buildSeedRoster(): Pick<StoreShape, 'batches' | 'students' | 'enrollments' | 'rosterEvaluations' | 'questionBank'> {
+function buildSeedRoster(): Pick<StoreShape, 'batches' | 'students' | 'enrollments' | 'questionBank'> {
   const batches: Batch[] = [
     { id: 'batch-mern-01', name: 'MERN-01 · Morning Batch', courseId: 'mern', startDate: '2026-04-01', endDate: '2026-09-30', scheduleDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], scheduleTime: '9:00 AM – 11:00 AM', mentorIds: ['mentor-ananya', 'mentor-vikram'], primaryMentorId: 'mentor-ananya', status: 'active' },
   ];
@@ -163,14 +162,8 @@ function buildSeedRoster(): Pick<StoreShape, 'batches' | 'students' | 'enrollmen
     expectedCompletion: '2026-09-30',
     status: 'active',
   }));
-  // Mini Task rows no longer live here — see admin/repository/submissionRepository.ts,
-  // which reads real per-student StudentProgress instead. Major Project reviews
-  // still use this array (ProjectProgressState has no evaluation-status field yet).
-  const rosterEvaluations: RosterEvaluationItem[] = [
-    { id: 'reval-3', kind: 'project', studentId: 'student-2', courseId: 'mern', moduleId: 'major-project', title: 'Full Stack E-Commerce Application — Frontend Milestone', submittedAt: '2026-09-17', status: 'Under Review', attempt: 1, githubUrl: 'https://github.com/priya-nair/mern-training', githubBranch: 'feature/ecommerce-frontend', liveUrl: 'https://priya-shop.example.com' },
-  ];
   const questionBank: BankQuestion[] = [];
-  return { batches, students, enrollments, rosterEvaluations, questionBank };
+  return { batches, students, enrollments, questionBank };
 }
 
 function makeProgressRecord(studentId: string, courseId: string, state: ReturnType<typeof createEmptyProgressState>): StudentProgress {
@@ -200,7 +193,13 @@ function buildSeedProgressRecords(): StudentProgress[] {
     ],
   };
   priya.project.milestoneStatus = { m1: 'completed', m2: 'completed', m3: 'completed', m4: 'completed', m5: 'current', m6: 'upcoming', m7: 'upcoming', m8: 'upcoming' };
-  priya.project.submission = { githubUrl: 'https://github.com/priya-nair/mern-training', liveUrl: 'https://priya-shop.example.com', documentationUrl: '', submittedAt: '2026-09-17T00:00:00.000Z' };
+  priya.project.status = 'Under Review';
+  priya.project.versions = [
+    {
+      version: 1, githubUrl: 'https://github.com/priya-nair/mern-training', repositoryName: 'priya-nair/mern-training',
+      branch: 'feature/ecommerce-frontend', liveUrl: 'https://priya-shop.example.com', documentationUrl: '', submittedAt: '2026-09-17T00:00:00.000Z',
+    },
+  ];
   priya.notifications = [{ id: 'p-n1', message: '"Build a React Todo Application" submitted for review.', date: '2026-09-19T00:00:00.000Z', kind: 'success' }];
 
   const arjun = createEmptyProgressState();
@@ -323,7 +322,6 @@ function migrate(raw: StoreShape): StoreShape {
   if (!s.certificates) s.certificates = [];
   if (!s.notificationRules) s.notificationRules = [];
   if (!s.questionBank) s.questionBank = [];
-  if (!s.rosterEvaluations) s.rosterEvaluations = [];
 
   // Pre-v3 stores never persisted student progress at all — it lived only in
   // React's useReducer state (state/AppStateContext.tsx), never in
@@ -333,6 +331,43 @@ function migrate(raw: StoreShape): StoreShape {
   // runs. Guarded by the array's presence, so it only ever runs once.
   if (!s.progressRecords) {
     s.progressRecords = buildSeedProgressRecords().filter((p) => s.students.some((st) => st.id === p.studentId));
+  }
+
+  // v3 -> v4: Major Project's `submission?: { githubUrl, liveUrl, documentationUrl,
+  // submittedAt }` became a versioned status+versions array, matching Mini
+  // Tasks (see state/types.ts's ProjectSubmissionVersion). Port any existing
+  // single submission into versions[0] rather than dropping it. Guarded by the
+  // new field's presence so it only ever runs once per record, and runs even
+  // when progressRecords already existed pre-v4.
+  s.progressRecords.forEach((p) => {
+    const legacyProject = p.project as unknown as { submission?: { githubUrl: string; liveUrl: string; documentationUrl: string; submittedAt: string }; status?: string; versions?: unknown[] };
+    if (legacyProject.versions === undefined) {
+      const submission = legacyProject.submission;
+      legacyProject.versions = submission ? [{ version: 1, ...submission }] : [];
+      legacyProject.status = submission ? 'Under Review' : 'Not Started';
+      delete legacyProject.submission;
+    }
+  });
+
+  // v3 -> v4: Major Project reviews used to live in the roster's rosterEvaluations
+  // mock queue (kind: 'project'), disconnected from the student's own
+  // StudentProgress. That array is gone from the store shape — any pending
+  // project row a v3 store still has on disk is folded into the matching
+  // student's progress.project (only if they have no real submission yet, so
+  // this never overwrites genuine v4 data) so it keeps surfacing in the
+  // Evaluation/Review Queues instead of silently vanishing.
+  const legacyRosterEvaluations = (raw as unknown as { rosterEvaluations?: { kind: string; studentId: string; courseId: string; status: string; attempt: number; githubUrl?: string; githubBranch?: string; liveUrl?: string; submittedAt: string }[] }).rosterEvaluations;
+  if (legacyRosterEvaluations) {
+    legacyRosterEvaluations
+      .filter((e) => e.kind === 'project')
+      .forEach((e) => {
+        const record = s.progressRecords.find((p) => p.studentId === e.studentId && p.courseId === e.courseId);
+        if (!record || record.project.versions.length > 0) return;
+        record.project.status = e.status as StudentProgress['project']['status'];
+        record.project.versions = [
+          { version: e.attempt || 1, githubUrl: e.githubUrl || '', repositoryName: e.githubUrl?.replace('https://github.com/', ''), branch: e.githubBranch, liveUrl: e.liveUrl || '', documentationUrl: '', submittedAt: e.submittedAt },
+        ];
+      });
   }
 
   // Students that existed before onboarding tracking was added are already

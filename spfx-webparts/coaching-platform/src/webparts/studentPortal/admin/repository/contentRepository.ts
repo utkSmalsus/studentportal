@@ -41,7 +41,7 @@ export function deleteModuleTest(courseId: string, testId: string): void {
 export function addQuestionToModuleTest(courseId: string, testId: string, q: Omit<TopicTestQuestionDef, 'id'>): void {
   const test = content(courseId)?.moduleTests.find((t) => t.id === testId);
   if (!test) return;
-  test.questions.push({ ...q, id: `${testId}-q${test.questions.length + 1}-${Date.now().toString(36)}` });
+  test.questions.push({ ...q, id: `${testId}-q${test.questions.length + 1}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}` });
   commit(courseId);
 }
 
@@ -85,7 +85,7 @@ export function deleteAssessment(courseId: string, assessmentId: string): void {
 export function addQuestionToAssessment(courseId: string, assessmentId: string, q: Omit<AssessmentQuestionDef, 'id'>): void {
   const a = content(courseId)?.assessments.find((aa) => aa.id === assessmentId);
   if (!a) return;
-  a.questions.push({ ...q, id: `${assessmentId}-q${a.questions.length + 1}-${Date.now().toString(36)}` });
+  a.questions.push({ ...q, id: `${assessmentId}-q${a.questions.length + 1}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}` });
   commit(courseId);
 }
 
@@ -101,7 +101,7 @@ export function removeQuestionFromAssessment(courseId: string, assessmentId: str
 export function createCodingQuestion(courseId: string, input: Omit<CodingQuestionDef, 'id'>): CodingQuestionDef | undefined {
   const c = content(courseId);
   if (!c) return undefined;
-  const q: CodingQuestionDef = { ...input, id: `dc-${Date.now().toString(36)}` };
+  const q: CodingQuestionDef = { ...input, id: `dc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}` };
   c.codingQuestions.push(q);
   c.codingQuestions.sort((a, b) => a.day - b.day);
   commit(courseId);
@@ -128,7 +128,7 @@ export function duplicateCodingQuestion(courseId: string, id: string): CodingQue
   const c = content(courseId);
   const q = c?.codingQuestions.find((qq) => qq.id === id);
   if (!c || !q) return undefined;
-  const copy: CodingQuestionDef = { ...JSON.parse(JSON.stringify(q)), id: `dc-${Date.now().toString(36)}`, day: q.day + 1, title: `${q.title} (Copy)` };
+  const copy: CodingQuestionDef = { ...JSON.parse(JSON.stringify(q)), id: `dc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, day: q.day + 1, title: `${q.title} (Copy)` };
   c.codingQuestions.push(copy);
   c.codingQuestions.sort((a, b) => a.day - b.day);
   commit(courseId);
@@ -140,7 +140,7 @@ export function duplicateCodingQuestion(courseId: string, id: string): CodingQue
 export function createMiniTask(courseId: string, input: Omit<MiniTaskDef, 'id'>): MiniTaskDef | undefined {
   const c = content(courseId);
   if (!c) return undefined;
-  const task: MiniTaskDef = { ...input, id: `task-${Date.now().toString(36)}` };
+  const task: MiniTaskDef = { ...input, id: `task-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}` };
   c.miniTasks.push(task);
   const m = c.moduleDefs.find((mm) => mm.id === input.moduleId);
   if (m && !m.miniTaskId) m.miniTaskId = task.id;
@@ -178,7 +178,7 @@ export function updateMajorProject(courseId: string, patch: Partial<Omit<MajorPr
 export function addMilestone(courseId: string, milestone: Omit<MilestoneDef, 'id'>): void {
   const c = content(courseId);
   if (!c) return;
-  c.majorProject.milestones.push({ ...milestone, id: `m-${Date.now().toString(36)}` });
+  c.majorProject.milestones.push({ ...milestone, id: `m-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}` });
   commit(courseId);
 }
 

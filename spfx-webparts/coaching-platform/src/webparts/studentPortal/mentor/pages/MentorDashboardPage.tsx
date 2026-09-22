@@ -6,6 +6,7 @@ import * as mentorRepo from '../../admin/repository/mentorRepository';
 import * as courseRepo from '../../admin/repository/courseRepository';
 import * as githubRepo from '../../admin/repository/githubRepository';
 import * as submissionRepo from '../../admin/repository/submissionRepository';
+import * as projectSubmissionRepo from '../../admin/repository/projectSubmissionRepository';
 
 const MentorDashboardPage: React.FC<{ mentorId: string; onNavigate: (r: MentorRoute) => void }> = ({ mentorId, onNavigate }) => {
   const students = mentorRepo.getStudentsForMentor(mentorId);
@@ -20,14 +21,22 @@ const MentorDashboardPage: React.FC<{ mentorId: string; onNavigate: (r: MentorRo
           courseId: sub.courseId,
           title: courseRepo.getCourseContent(sub.courseId)?.miniTasks.find((t) => t.id === sub.taskId)?.title || sub.taskId,
           submittedAt: sub.submittedAt,
+        })),
+        projectSubmissionRepo.listPendingProjectSubmissions([s.id], s.courseId).map((sub) => ({
+          id: sub.id,
+          studentId: sub.studentId,
+          courseId: sub.courseId,
+          title: courseRepo.getCourseContent(sub.courseId)?.majorProject.title || 'Major Project',
+          submittedAt: sub.submittedAt,
         }))
       ),
     []
   );
 
   const behind = students.filter((s) => s.status === 'paused');
-  const liveStudent = students.find((s) => s.isLiveDemoStudent);
-  const liveActivity = liveStudent ? githubRepo.listActivityForStudent(liveStudent.id).slice(0, 5) : [];
+  // Every one of the mentor's students, not just the single live demo
+  // session — a mentor with several students must see all of their activity.
+  const recentActivity = githubRepo.listRecentActivity(students.map((s) => s.id), 5);
 
   return (
     <div>
@@ -94,14 +103,14 @@ const MentorDashboardPage: React.FC<{ mentorId: string; onNavigate: (r: MentorRo
         <div>
           <Card>
             <SectionTitle>Recent GitHub Activity</SectionTitle>
-            {liveActivity.length === 0 ? (
+            {recentActivity.length === 0 ? (
               <p className="text-sm text-slate-400">No recent activity.</p>
             ) : (
               <ul className="space-y-3 text-sm">
-                {liveActivity.map((a) => (
+                {recentActivity.map((a) => (
                   <li key={a.id}>
                     <div className="font-medium text-slate-800">
-                      {liveStudent?.name} {a.action === 'push' ? 'pushed a commit' : a.action === 'open_pr' ? 'opened a Pull Request' : a.action}
+                      {students.find((s) => s.id === a.studentId)?.name} {a.action === 'push' ? 'pushed a commit' : a.action === 'open_pr' ? 'opened a Pull Request' : a.action}
                     </div>
                     <div className="text-xs text-slate-400">
                       {a.repositoryName} {a.branch && `· ${a.branch}`} · {new Date(a.createdAt).toLocaleDateString()}

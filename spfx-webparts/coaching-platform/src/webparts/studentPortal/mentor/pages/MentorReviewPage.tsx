@@ -4,10 +4,10 @@ import { PageHeader, Card, SectionTitle, PrimaryButton, SecondaryButton } from '
 import { AdminTable, AdminColumn, StatusBadge, Drawer, FormField, TextArea } from '../../admin/ui/AdminPrimitives';
 import { SemanticColor } from '../../ui/statusMeta';
 import * as mentorRepo from '../../admin/repository/mentorRepository';
-import * as rosterRepo from '../../admin/repository/rosterRepository';
 import * as courseRepo from '../../admin/repository/courseRepository';
 import * as submissionRepo from '../../admin/repository/submissionRepository';
-import { EvaluationStatus, RosterEvaluationItem } from '../../admin/types';
+import * as projectSubmissionRepo from '../../admin/repository/projectSubmissionRepository';
+import { EvaluationStatus } from '../../admin/types';
 
 const statusColor: Record<EvaluationStatus, SemanticColor> = { 'Under Review': 'amber', 'Changes Requested': 'amber', Passed: 'green' };
 
@@ -33,7 +33,6 @@ interface QueueRow {
 const MentorReviewPage: React.FC<{ mentorId: string }> = ({ mentorId }) => {
   const myStudents = mentorRepo.getStudentsForMentor(mentorId);
   const courses = courseRepo.listCourses();
-  const rosterEvals = rosterRepo.listRosterEvaluations().filter((e) => myStudents.some((s) => s.id === e.studentId));
   const [tab, setTab] = useState<'miniTask' | 'project'>('miniTask');
   const [open, setOpen] = useState<QueueRow | undefined>();
   const [feedback, setFeedback] = useState('');
@@ -61,13 +60,29 @@ const MentorReviewPage: React.FC<{ mentorId: string }> = ({ mentorId }) => {
     })));
   }, []);
 
-  const projectRows: QueueRow[] = rosterEvals
-    .filter((e) => e.kind === 'project')
-    .map((e: RosterEvaluationItem) => ({
-      id: e.id, kind: 'project', studentId: e.studentId, courseId: e.courseId, studentName: myStudents.find((s) => s.id === e.studentId)?.name || 'Unknown',
-      courseTitle: courses.find((c) => c.id === e.courseId)?.title || '', moduleTitle: courseRepo.getCourseContent(e.courseId)?.moduleDefs.find((m) => m.id === e.moduleId)?.title || e.moduleId,
-      title: e.title, submittedAt: e.submittedAt, status: e.status, attempt: e.attempt, githubUrl: e.githubUrl, githubBranch: e.githubBranch, liveUrl: e.liveUrl, notes: e.notes,
-    }));
+  const projectRows: QueueRow[] = myStudents.reduce<QueueRow[]>((rows, s) => {
+    const content = courseRepo.getCourseContent(s.courseId);
+    const submission = projectSubmissionRepo.getProjectSubmission(s.id, s.courseId);
+    if (!content || !submission || ['Under Review', 'Submitted', 'Resubmitted'].indexOf(submission.status) === -1) return rows;
+    return rows.concat([
+      {
+        id: submission.id,
+        kind: 'project' as const,
+        studentId: submission.studentId,
+        courseId: submission.courseId,
+        studentName: s.name,
+        courseTitle: courses.find((c) => c.id === s.courseId)?.title || '',
+        moduleTitle: content.moduleDefs.find((m) => m.id === content.majorProject.moduleId)?.title || content.majorProject.title,
+        title: content.majorProject.title,
+        submittedAt: submission.submittedAt,
+        status: submission.status as EvaluationStatus,
+        attempt: submission.attempt,
+        githubUrl: submission.repositoryName ? `https://github.com/${submission.repositoryName}` : undefined,
+        githubBranch: submission.branch,
+        liveUrl: submission.liveUrl,
+      },
+    ]);
+  }, []);
 
   const rows = tab === 'miniTask' ? miniTaskRows : projectRows;
 
@@ -82,6 +97,11 @@ const MentorReviewPage: React.FC<{ mentorId: string }> = ({ mentorId }) => {
   ];
 
   const openTaskDef = open?.kind === 'miniTask' && open.taskId ? courseRepo.getCourseContent(open.courseId)?.miniTasks.find((t) => t.id === open.taskId) : undefined;
+  const openEvaluationCriteria = openTaskDef
+    ? openTaskDef.evaluationCriteriaTemplate
+    : open?.kind === 'project'
+    ? courseRepo.getCourseContent(open.courseId)?.majorProject.evaluationCriteriaTemplate
+    : undefined;
 
   const openRow = (row: QueueRow): void => {
     setOpen(row);
@@ -91,11 +111,12 @@ const MentorReviewPage: React.FC<{ mentorId: string }> = ({ mentorId }) => {
 
   const submitOutcome = (outcome: EvaluationStatus): void => {
     if (!open) return;
-    if (open.kind === 'miniTask' && open.taskId && openTaskDef) {
-      const criteria = openTaskDef.evaluationCriteriaTemplate.map((c) => ({ label: c.label, score: scores[c.label] ?? Math.round(c.maxScore * 0.8), maxScore: c.maxScore }));
-      submissionRepo.evaluateSubmission(open.studentId, open.courseId, open.taskId, open.attempt, { criteria, feedback, outcome: outcome === 'Passed' ? 'Passed' : 'Changes Requested' });
+    const criteria = (openEvaluationCriteria || []).map((c) => ({ label: c.label, score: scores[c.label] ?? Math.round(c.maxScore * 0.8), maxScore: c.maxScore }));
+    const resolvedOutcome = outcome === 'Passed' ? 'Passed' : 'Changes Requested';
+    if (open.kind === 'miniTask' && open.taskId) {
+      submissionRepo.evaluateSubmission(open.studentId, open.courseId, open.taskId, open.attempt, { criteria, feedback, outcome: resolvedOutcome });
     } else {
-      rosterRepo.submitRosterEvaluation(open.id, outcome, feedback);
+      projectSubmissionRepo.evaluateProjectSubmission(open.studentId, open.courseId, open.attempt, { criteria, feedback, outcome: resolvedOutcome });
     }
     setOpen(undefined);
   };
@@ -158,11 +179,11 @@ const MentorReviewPage: React.FC<{ mentorId: string }> = ({ mentorId }) => {
               </p>
             </Card>
 
-            {openTaskDef && (
+            {openEvaluationCriteria && (
               <Card>
                 <SectionTitle>Scorecard</SectionTitle>
                 <div className="space-y-3">
-                  {openTaskDef.evaluationCriteriaTemplate.map((c) => (
+                  {openEvaluationCriteria.map((c) => (
                     <div key={c.label} className="flex items-center justify-between gap-3">
                       <span className="text-sm font-medium text-slate-700">{c.label}</span>
                       <input

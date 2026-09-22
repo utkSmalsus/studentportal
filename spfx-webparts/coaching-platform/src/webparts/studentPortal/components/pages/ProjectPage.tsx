@@ -46,6 +46,7 @@ const ProjectPage: React.FC = () => {
   const progressPercent = Math.round((completedCount / majorProject.milestones.length) * 100);
   const currentMilestone = majorProject.milestones.find((m) => progress.project.milestoneStatus[m.id] === 'current');
   const allMilestonesDone = completedCount === majorProject.milestones.length;
+  const latestSubmission = progress.project.versions[progress.project.versions.length - 1];
 
   return (
     <div>
@@ -168,23 +169,27 @@ const ProjectPage: React.FC = () => {
       {allMilestonesDone && (
         <Card className="mt-6">
           <SectionTitle>Final Submission</SectionTitle>
-          {progress.project.submission ? (
+          {latestSubmission ? (
             <div className="text-sm space-y-1.5">
               <div>
                 <span className="text-slate-400">GitHub: </span>
-                <a href={progress.project.submission.githubUrl} className="text-indigo-600 font-medium hover:underline">
-                  {progress.project.submission.githubUrl}
+                <a href={latestSubmission.githubUrl} className="text-indigo-600 font-medium hover:underline">
+                  {latestSubmission.githubUrl}
                 </a>
               </div>
-              {progress.project.submission.liveUrl && (
+              {latestSubmission.liveUrl && (
                 <div>
                   <span className="text-slate-400">Live: </span>
-                  <a href={progress.project.submission.liveUrl} className="text-indigo-600 font-medium hover:underline">
-                    {progress.project.submission.liveUrl}
+                  <a href={latestSubmission.liveUrl} className="text-indigo-600 font-medium hover:underline">
+                    {latestSubmission.liveUrl}
                   </a>
                 </div>
               )}
-              <Tag>Awaiting instructor evaluation</Tag>
+              {latestSubmission.evaluation ? (
+                <Tag>{latestSubmission.evaluation.outcome === 'Passed' ? 'Passed final review' : 'Changes requested'}</Tag>
+              ) : (
+                <Tag>Awaiting instructor evaluation</Tag>
+              )}
             </div>
           ) : (
             <div className="space-y-3.5 max-w-lg">
