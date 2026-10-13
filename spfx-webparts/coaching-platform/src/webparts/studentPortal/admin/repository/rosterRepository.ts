@@ -10,6 +10,7 @@
 // need to special-case the live student.
 import { state, commit } from './store';
 import { Batch, StudentRecord, Enrollment } from '../types';
+import { saveBatchToSP, saveStudentToSP, saveEnrollmentToSP } from '../../services/spDataService';
 
 export function listBatches(): Batch[] {
   return state.batches;
@@ -19,6 +20,7 @@ export function createBatch(input: Omit<Batch, 'id'>): Batch {
   const batch: Batch = { ...input, id: `batch-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}` };
   state.batches.push(batch);
   commit();
+  saveBatchToSP(batch).catch(() => {});
   return batch;
 }
 
@@ -27,6 +29,7 @@ export function updateBatch(id: string, patch: Partial<Omit<Batch, 'id'>>): void
   if (!b) return;
   Object.assign(b, patch);
   commit();
+  saveBatchToSP(b).catch(() => {});
 }
 
 export function archiveBatch(id: string): void {
@@ -46,6 +49,7 @@ export function updateStudent(id: string, patch: Partial<Omit<StudentRecord, 'id
   if (!s) return;
   Object.assign(s, patch);
   commit();
+  saveStudentToSP(s).catch(() => {});
 }
 
 export function listEnrollments(): Enrollment[] {
@@ -69,6 +73,8 @@ export function enrollStudent(input: { studentId: string; courseId: string; batc
     state.activeCourseId = input.courseId;
   }
   commit();
+  saveEnrollmentToSP(enrollment).catch(() => {});
+  if (student) saveStudentToSP(student).catch(() => {});
   return enrollment;
 }
 
@@ -76,5 +82,6 @@ export function createStudent(input: Omit<StudentRecord, 'id'>): StudentRecord {
   const student: StudentRecord = { ...input, id: `student-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}` };
   state.students.push(student);
   commit();
+  saveStudentToSP(student).catch(() => {});
   return student;
 }

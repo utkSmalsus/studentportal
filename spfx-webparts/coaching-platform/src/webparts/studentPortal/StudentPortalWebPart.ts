@@ -12,6 +12,8 @@ import * as strings from 'StudentPortalWebPartStrings';
 import AppRoot from './components/AppRoot';
 import { IStudentPortalProps } from './components/IStudentPortalProps';
 import { tailwindCss } from './styles/tailwindCss';
+import { canvasOverrideCss } from './styles/canvasOverride';
+import { getSP } from './services/pnpjsConfig';
 
 export interface IStudentPortalWebPartProps {
   description: string;
@@ -29,6 +31,22 @@ export default class StudentPortalWebPart extends BaseClientSideWebPart<IStudent
   // rest of the page — this is what keeps the two stylesheets from
   // colliding once this is deployed to a real site.
   private _reactMountPoint: HTMLDivElement | undefined;
+
+  private _injectCanvasOverride(): void {
+    const styleId = 'spfx-canvas-override-css';
+    if (!document.getElementById(styleId)) {
+      const style = document.createElement('style');
+      style.id = styleId;
+      style.textContent = canvasOverrideCss;
+      document.head.appendChild(style);
+    }
+    if (this.domElement) {
+      this.domElement.style.width = '100%';
+      this.domElement.style.maxWidth = '100%';
+      this.domElement.style.margin = '0';
+      this.domElement.style.padding = '0';
+    }
+  }
 
   private _ensureShadowRoot(): HTMLDivElement {
     if (this._reactMountPoint) {
@@ -49,23 +67,29 @@ export default class StudentPortalWebPart extends BaseClientSideWebPart<IStudent
   }
 
   public render(): void {
+    this._injectCanvasOverride();
+
     const element: React.ReactElement<IStudentPortalProps> = React.createElement(
       AppRoot,
       {
         description: this.properties.description,
         isDarkTheme: this._isDarkTheme,
         environmentMessage: this._environmentMessage,
-        userDisplayName: this.context.pageContext.user.displayName
+        userDisplayName: this.context.pageContext.user.displayName,
+        userEmail: this.context.pageContext.user.email,
+        userLoginName: this.context.pageContext.user.loginName
       }
     );
 
     ReactDom.render(element, this._ensureShadowRoot());
   }
 
-  protected onInit(): Promise<void> {
-    return this._getEnvironmentMessage().then(message => {
-      this._environmentMessage = message;
-    });
+  protected async onInit(): Promise<void> {
+    await super.onInit();
+    getSP(this.context);
+    this._injectCanvasOverride();
+    const message = await this._getEnvironmentMessage();
+    this._environmentMessage = message;
   }
 
 
@@ -116,6 +140,10 @@ export default class StudentPortalWebPart extends BaseClientSideWebPart<IStudent
   }
 
   protected onDispose(): void {
+    const style = document.getElementById('spfx-canvas-override-css');
+    if (style && style.parentNode) {
+      style.parentNode.removeChild(style);
+    }
     if (this._reactMountPoint) {
       ReactDom.unmountComponentAtNode(this._reactMountPoint);
     }

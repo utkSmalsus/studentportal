@@ -8,7 +8,7 @@ import { useAppState } from '../../state/AppStateContext';
 import * as progression from '../../state/engine/progression';
 import { getMiniTaskById, moduleDefs, getModuleById } from '../../data/selectors';
 import { MiniTaskProgressEntry } from '../../state/types';
-import * as githubRepo from '../../admin/repository/githubRepository';
+import { useGitHubRepositoryLink, useRecordGitHubActivity } from '../../hooks';
 
 const needsSubmission = (status: string): boolean =>
   status === 'Not Started' || status === 'In Progress' || status === 'Changes Requested';
@@ -51,7 +51,8 @@ const TaskDetailPage: React.FC<{ taskId: string; onNavigate: (r: Route) => void 
   const entry = progress.miniTasks[taskId];
   const latestVersion = entry?.versions[entry.versions.length - 1];
 
-  const repoLink = task ? githubRepo.getRepositoryLink(studentId, task.courseId) : undefined;
+  const { data: repoLink } = useGitHubRepositoryLink(studentId, task?.courseId || '');
+  const recordActivityMutation = useRecordGitHubActivity();
 
   const [githubUrl, setGithubUrl] = useState(latestVersion?.githubUrl || '');
   const [branch, setBranch] = useState(latestVersion?.githubBranch || task?.githubBranch || '');
@@ -87,8 +88,14 @@ const TaskDetailPage: React.FC<{ taskId: string; onNavigate: (r: Route) => void 
       branch: branch || undefined,
       pullRequestUrl: pullRequestUrl || undefined,
     });
-    if (repoLink) {
-      githubRepo.recordActivity(studentId, task.courseId, repoLink.repositoryName, 'push', { branch: branch || undefined, message: `Submit "${task.title}"` });
+    if (repoLink && task) {
+      recordActivityMutation.mutate({
+        studentId,
+        courseId: task.courseId,
+        repositoryName: repoLink.repositoryName,
+        action: 'push',
+        extra: { branch: branch || undefined, message: `Submit "${task.title}"` },
+      });
     }
     setNotes('');
   };

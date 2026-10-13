@@ -1,22 +1,26 @@
 import * as React from 'react';
-import { PageHeader, Card, SectionTitle, StatusPill } from '../../ui/Primitives';
-import * as mentorRepo from '../../admin/repository/mentorRepository';
-import * as courseRepo from '../../admin/repository/courseRepository';
+import { PageHeader, Card, SectionTitle, StatusPill, LoadingState } from '../../ui/Primitives';
 import { SemanticColor } from '../../ui/statusMeta';
 import { BatchStatus } from '../../admin/types';
+import { useBatchesForMentor, useCourses, useStudentsForMentor } from '../../hooks';
 
 const statusColor: Record<BatchStatus, SemanticColor> = { upcoming: 'blue', active: 'green', completed: 'gray' };
 
 const MyBatchesPage: React.FC<{ mentorId: string }> = ({ mentorId }) => {
-  const batches = mentorRepo.getBatchesForMentor(mentorId);
-  const courses = courseRepo.listCourses();
+  const { data: batches = [], isLoading: isLoadingBatches } = useBatchesForMentor(mentorId);
+  const { data: courses = [], isLoading: isLoadingCourses } = useCourses();
+  const { data: students = [], isLoading: isLoadingStudents } = useStudentsForMentor(mentorId);
+
+  if (isLoadingBatches || isLoadingCourses || isLoadingStudents) {
+    return <LoadingState label="Loading batches..." />;
+  }
 
   return (
     <div>
       <PageHeader eyebrow="Students" title="My Batches" subtitle="Cohorts you mentor." />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {batches.map((b) => {
-          const students = mentorRepo.getStudentsForMentor(mentorId).filter((s) => s.batchId === b.id);
+          const batchStudents = students.filter((s) => s.batchId === b.id);
           return (
             <Card key={b.id}>
               <div className="flex items-center justify-between mb-2">
@@ -28,7 +32,7 @@ const MyBatchesPage: React.FC<{ mentorId: string }> = ({ mentorId }) => {
               <p className="text-sm text-slate-600 mb-3">
                 {b.scheduleDays.join(', ')} &middot; {b.scheduleTime}
               </p>
-              <p className="text-sm text-slate-500">{students.length} students &middot; {b.startDate} → {b.endDate}</p>
+              <p className="text-sm text-slate-500">{batchStudents.length} students &middot; {b.startDate} → {b.endDate}</p>
               {b.primaryMentorId === mentorId && <StatusPill color="blue">Primary Mentor</StatusPill>}
             </Card>
           );

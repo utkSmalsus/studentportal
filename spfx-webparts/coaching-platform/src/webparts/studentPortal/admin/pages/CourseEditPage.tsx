@@ -1,31 +1,39 @@
 import * as React from 'react';
 import { useState } from 'react';
 import { AdminRoute } from '../navigation/types';
-import { BackLink, Card, SectionTitle, PrimaryButton, SecondaryButton, StatusPill, EmptyState } from '../../ui/Primitives';
+import { BackLink, Card, SectionTitle, PrimaryButton, SecondaryButton, StatusPill, EmptyState, LoadingState } from '../../ui/Primitives';
 import { FormField, FormSection, TextInput, TextArea, Select, Checkbox, ConfirmDialog } from '../ui/AdminPrimitives';
 import { PlusIcon, TrashIcon } from '../../ui/icons';
-import * as courseRepo from '../repository/courseRepository';
-import * as curriculum from '../repository/curriculumRepository';
 import { CourseMeta, TimelineType, ScheduleMode, LearningMode, ProgressionRules, GithubRepositoryStrategy, GithubBranchStrategy } from '../types';
 import { ModuleDef, ModuleGroup } from '../../data/types';
+import {
+  useCourseContent,
+  useUpdateCourseMeta,
+  useValidateCourse,
+  usePublishCourse,
+  useCreateModule,
+  useReorderModule,
+  useDeleteModule,
+} from '../../hooks';
 
 type Tab = 'basic' | 'timeline' | 'rules' | 'curriculum' | 'github' | 'publish';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const GROUPS: ModuleGroup[] = ['Foundation', 'Programming', 'Frontend', 'Backend', 'Full Stack', 'Capstone'];
 
-// Section 7: a convenient module-management surface right inside Course Edit —
-// Curriculum Builder (admin/pages/CurriculumBuilderPage.tsx) remains available
-// for detailed topic/content editing; this is the quick overview + add/edit/
-// delete/reorder/publish-status list.
 const CurriculumTab: React.FC<{ courseId: string; onOpenBuilder: () => void }> = ({ courseId, onOpenBuilder }) => {
-  const content = courseRepo.getCourseContent(courseId);
+  const { data: content, isLoading } = useCourseContent(courseId);
+  const createModuleMutation = useCreateModule();
+  const reorderModuleMutation = useReorderModule();
+  const deleteModuleMutation = useDeleteModule();
+
   const [creating, setCreating] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newGroup, setNewGroup] = useState<ModuleGroup>('Foundation');
   const [newDuration, setNewDuration] = useState('1 week');
   const [deleteTarget, setDeleteTarget] = useState<ModuleDef | undefined>();
 
+  if (isLoading) return <LoadingState label="Loading curriculum..." />;
   if (!content) return null;
   const modules = content.course.moduleOrder.map((id) => content.moduleDefs.find((m) => m.id === id)).filter((m): m is ModuleDef => !!m);
 
@@ -59,14 +67,18 @@ const CurriculumTab: React.FC<{ courseId: string; onOpenBuilder: () => void }> =
           <div className="flex items-center gap-2">
             <PrimaryButton
               className="text-xs px-3 py-1.5"
-              onClick={() => {
+              disabled={createModuleMutation.isLoading}
+              onClick={async () => {
                 if (!newTitle.trim()) return;
-                curriculum.createModule(courseId, { title: newTitle, group: newGroup, estimatedDuration: newDuration });
+                await createModuleMutation.mutateAsync({
+                  courseId,
+                  input: { title: newTitle, group: newGroup, estimatedDuration: newDuration },
+                });
                 setCreating(false);
                 setNewTitle('');
               }}
             >
-              Add
+              {createModuleMutation.isLoading ? 'Adding...' : 'Add'}
             </PrimaryButton>
             <SecondaryButton className="text-xs px-3 py-1.5" onClick={() => setCreating(false)}>
               Cancel
@@ -91,10 +103,18 @@ const CurriculumTab: React.FC<{ courseId: string; onOpenBuilder: () => void }> =
                   {m.assessmentId && ' · Assessment'}
                 </div>
               </div>
-              <button disabled={i === 0} onClick={() => curriculum.reorderModule(courseId, m.id, 'up')} className="text-slate-300 hover:text-slate-600 disabled:opacity-30 shrink-0">
+              <button
+                disabled={i === 0 || reorderModuleMutation.isLoading}
+                onClick={() => reorderModuleMutation.mutate({ courseId, moduleId: m.id, direction: 'up' })}
+                className="text-slate-300 hover:text-slate-600 disabled:opacity-30 shrink-0"
+              >
                 ↑
               </button>
-              <button disabled={i === modules.length - 1} onClick={() => curriculum.reorderModule(courseId, m.id, 'down')} className="text-slate-300 hover:text-slate-600 disabled:opacity-30 shrink-0">
+              <button
+                disabled={i === modules.length - 1 || reorderModuleMutation.isLoading}
+                onClick={() => reorderModuleMutation.mutate({ courseId, moduleId: m.id, direction: 'down' })}
+                className="text-slate-300 hover:text-slate-600 disabled:opacity-30 shrink-0"
+              >
                 ↓
               </button>
               <button onClick={onOpenBuilder} className="text-xs font-semibold text-indigo-600 hover:underline shrink-0">
@@ -114,8 +134,10 @@ const CurriculumTab: React.FC<{ courseId: string; onOpenBuilder: () => void }> =
         description="This removes the module, its topics and tests permanently."
         confirmLabel="Delete"
         danger
-        onConfirm={() => {
-          if (deleteTarget) curriculum.deleteModule(courseId, deleteTarget.id);
+        onConfirm={async () => {
+          if (deleteTarget) {
+            await deleteModuleMutation.mutateAsync({ courseId, moduleId: deleteTarget.id });
+          }
           setDeleteTarget(undefined);
         }}
         onCancel={() => setDeleteTarget(undefined)}
@@ -125,24 +147,23 @@ const CurriculumTab: React.FC<{ courseId: string; onOpenBuilder: () => void }> =
 };
 
 const PublishPanel: React.FC<{ courseId: string; onPreviewAsStudent: (courseId: string) => void }> = ({ courseId, onPreviewAsStudent }) => {
-  const [issues, setIssues] = useState(() => courseRepo.validateCourse(courseId));
-  const meta = courseRepo.getCourseMeta(courseId);
-  if (!meta) return null;
+  const { data: issues = [], isLoading: validationLoading, refetch } = useValidateCourse(courseId);
+  const publishMutation = usePublishCourse();
+
   const errors = issues.filter((i) => i.severity === 'error');
 
   return (
     <Card className="max-w-2xl">
       <SectionTitle>Publish Course</SectionTitle>
       <div className="flex items-center gap-2 mb-4">
-        <SecondaryButton onClick={() => setIssues(courseRepo.validateCourse(courseId))}>Validate</SecondaryButton>
+        <SecondaryButton onClick={() => refetch()} disabled={validationLoading}>
+          {validationLoading ? 'Validating...' : 'Validate'}
+        </SecondaryButton>
         <PrimaryButton
-          onClick={() => {
-            const result = courseRepo.publishCourse(courseId);
-            setIssues(result.issues);
-          }}
-          disabled={errors.length > 0}
+          onClick={() => publishMutation.mutate(courseId)}
+          disabled={errors.length > 0 || publishMutation.isLoading}
         >
-          Publish Course
+          {publishMutation.isLoading ? 'Publishing...' : 'Publish Course'}
         </PrimaryButton>
       </div>
 
@@ -150,7 +171,11 @@ const PublishPanel: React.FC<{ courseId: string; onPreviewAsStudent: (courseId: 
         <p className="text-sm text-emerald-600 font-medium">No issues found — this course is ready to publish.</p>
       ) : (
         <div className="space-y-2">
-          {errors.length > 0 && <p className="text-sm font-semibold text-red-600">Cannot publish course. {errors.length} issue{errors.length === 1 ? '' : 's'} found:</p>}
+          {errors.length > 0 && (
+            <p className="text-sm font-semibold text-red-600">
+              Cannot publish course. {errors.length} issue{errors.length === 1 ? '' : 's'} found:
+            </p>
+          )}
           <ul className="space-y-1.5">
             {issues.map((issue, i) => (
               <li key={i} className={`text-sm flex items-start gap-2 ${issue.severity === 'error' ? 'text-red-600' : 'text-amber-600'}`}>
@@ -168,14 +193,30 @@ const PublishPanel: React.FC<{ courseId: string; onPreviewAsStudent: (courseId: 
   );
 };
 
-const CourseEditPage: React.FC<{ courseId: string; onNavigate: (r: AdminRoute) => void; onPreviewAsStudent: (courseId: string) => void }> = ({ courseId, onNavigate, onPreviewAsStudent }) => {
-  const content = courseRepo.getCourseContent(courseId);
+const CourseEditPage: React.FC<{
+  courseId: string;
+  onNavigate: (r: AdminRoute) => void;
+  onPreviewAsStudent: (courseId: string) => void;
+}> = ({ courseId, onNavigate, onPreviewAsStudent }) => {
+  const { data: content, isLoading } = useCourseContent(courseId);
+  const updateMetaMutation = useUpdateCourseMeta();
   const [tab, setTab] = useState<Tab>('basic');
+
+  if (isLoading) {
+    return (
+      <div>
+        <BackLink onClick={() => onNavigate({ view: 'courses' })}>Courses</BackLink>
+        <LoadingState label="Loading course..." />
+      </div>
+    );
+  }
 
   if (!content) return <EmptyState title="Course not found" />;
   const meta = content.meta;
 
-  const update = (patch: Partial<CourseMeta>): void => courseRepo.updateCourseMeta(courseId, patch);
+  const update = (patch: Partial<CourseMeta>): void => {
+    updateMetaMutation.mutate({ courseId, patch });
+  };
   const updateTimeline = (patch: Partial<CourseMeta['timeline']>): void => update({ timeline: { ...meta.timeline, ...patch } });
   const updateRules = (patch: Partial<ProgressionRules>): void => update({ defaultProgressionRules: { ...meta.defaultProgressionRules, ...patch } });
   const updateGithub = (patch: Partial<CourseMeta['githubSettings']>): void => update({ githubSettings: { ...meta.githubSettings, ...patch } });

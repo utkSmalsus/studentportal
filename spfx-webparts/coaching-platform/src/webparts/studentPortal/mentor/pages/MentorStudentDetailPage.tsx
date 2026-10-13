@@ -1,31 +1,44 @@
 import * as React from 'react';
 import { MentorRoute } from '../navigation/types';
-import { BackLink, Card, SectionTitle, StatusPill, EmptyState } from '../../ui/Primitives';
-import * as mentorRepo from '../../admin/repository/mentorRepository';
-import * as courseRepo from '../../admin/repository/courseRepository';
-import * as githubRepo from '../../admin/repository/githubRepository';
-import { getStudentProgressView } from '../../admin/repository/progressView';
-import * as submissionRepo from '../../admin/repository/submissionRepository';
+import { BackLink, Card, SectionTitle, StatusPill, EmptyState, LoadingState } from '../../ui/Primitives';
 import * as progression from '../../state/engine/progression';
+import { MiniTaskSubmission } from '../../state/submissionTypes';
+import {
+  useStudentsForMentor,
+  useCourses,
+  useStudentProgressView,
+  useSubmissionsForStudent,
+  useGitHubConnection,
+  useGitHubRepositoryLink,
+  useGitHubRepository,
+  useGitHubActivity,
+} from '../../hooks';
 
 const MentorStudentDetailPage: React.FC<{ mentorId: string; studentId: string; onNavigate: (r: MentorRoute) => void }> = ({ mentorId, studentId, onNavigate }) => {
-  const student = mentorRepo.getStudentsForMentor(mentorId).find((s) => s.id === studentId);
-  const courses = courseRepo.listCourses();
+  const { data: students = [], isLoading: isLoadingStudents } = useStudentsForMentor(mentorId);
+  const { data: courses = [] } = useCourses();
+
+  const student = students.find((s) => s.id === studentId);
+
+  const { data: view, isLoading: isLoadingView } = useStudentProgressView(studentId, student ? student.courseId : '');
+  const { data: submissions = [] } = useSubmissionsForStudent(studentId, student ? student.courseId : '');
+  const { data: connection } = useGitHubConnection(studentId);
+  const { data: repoLink } = useGitHubRepositoryLink(studentId, student ? student.courseId : '');
+  const repoOwner = repoLink?.owner || '';
+  const repoName = repoLink ? repoLink.repositoryName.split('/')[1] || '' : '';
+  const { data: snapshot } = useGitHubRepository(repoOwner, repoName);
+  const { data: activity = [] } = useGitHubActivity(studentId);
+
+  if (isLoadingStudents) {
+    return <LoadingState label="Loading student details..." />;
+  }
 
   if (!student) return <EmptyState title="Student not found or not assigned to you" />;
 
-  const view = getStudentProgressView(studentId, student.courseId);
-  // One row per task, the latest attempt only — mirrors what
-  // submissionRepository.listPendingSubmissions already does for queues.
-  type MiniTaskSubmission = ReturnType<typeof submissionRepo.listSubmissionsForStudent>[number];
-  const latestMiniTaskByTaskId = submissionRepo.listSubmissionsForStudent(studentId, student.courseId).reduce<Record<string, MiniTaskSubmission>>((byTask, sub) => {
+  const latestMiniTaskByTaskId = submissions.reduce<Record<string, MiniTaskSubmission>>((byTask, sub) => {
     if (!byTask[sub.taskId] || sub.attempt > byTask[sub.taskId].attempt) byTask[sub.taskId] = sub;
     return byTask;
   }, {});
-  const connection = githubRepo.getConnection(studentId);
-  const repoLink = githubRepo.getRepositoryLink(studentId, student.courseId);
-  const snapshot = repoLink ? githubRepo.getRepository(repoLink.owner, repoLink.repositoryName.split('/')[1]) : undefined;
-  const activity = githubRepo.listActivityForStudent(studentId);
 
   return (
     <div>
@@ -48,7 +61,9 @@ const MentorStudentDetailPage: React.FC<{ mentorId: string; studentId: string; o
         <div className="lg:col-span-2 space-y-6">
           <Card>
             <SectionTitle>Progress</SectionTitle>
-            {view ? (
+            {isLoadingView ? (
+              <LoadingState label="Loading progress..." />
+            ) : view ? (
               <dl className="grid grid-cols-2 gap-4 text-sm">
                 <div><dt className="text-slate-400">Overall Progress</dt><dd className="text-lg font-bold text-slate-900">{view.overallPercent}%</dd></div>
                 <div><dt className="text-slate-400">Current Module</dt><dd className="text-lg font-bold text-slate-900">{view.currentModuleTitle}</dd></div>

@@ -1,19 +1,22 @@
 import * as React from 'react';
-import { PageHeader, Card, SectionTitle, EmptyState, ProgressBar } from '../../ui/Primitives';
+import { PageHeader, Card, SectionTitle, EmptyState, ProgressBar, LoadingState } from '../../ui/Primitives';
 import { AwardIcon } from '../../ui/icons';
 import { useAppState } from '../../state/AppStateContext';
-import * as courseRepo from '../../admin/repository/courseRepository';
-import * as settingsRepo from '../../admin/repository/settingsRepository';
-import { getStudentProgressView } from '../../admin/repository/progressView';
+import { useCourseMeta, useCertificateForCourse, useStudentProgressView } from '../../hooks';
 
 // Mirrors admin/pages/CertificatesAdminPage.tsx's isEligible exactly — same
 // course-scoped config, same progress view, so a student never sees
 // "Available" here while the admin's own eligibility table disagrees.
 const CertificatesPage: React.FC = () => {
   const { studentId, courseId } = useAppState();
-  const courseMeta = courseRepo.getCourseMeta(courseId);
-  const cert = settingsRepo.getCertificateForCourse(courseId);
-  const view = getStudentProgressView(studentId, courseId);
+  const { data: courseMeta, isLoading: isCourseLoading } = useCourseMeta(courseId);
+  const { data: cert, isLoading: isCertLoading } = useCertificateForCourse(courseId);
+  const { data: view, isLoading: isViewLoading } = useStudentProgressView(studentId, courseId);
+
+  if (isCourseLoading || isCertLoading || isViewLoading) {
+    return <LoadingState label="Loading certificate details..." />;
+  }
+
   const eligible = !!view && !!cert && (cert.requireAllModulesComplete ? view.currentModuleTitle === 'Complete' : view.overallPercent >= 100);
 
   return (

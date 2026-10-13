@@ -10,6 +10,7 @@ import { createEmptyProgressState } from '../../state/initialState';
 import { progressReducer, ProgressAction, ProgressCourseContent } from '../../state/progressReducer';
 import { assertStudentExists, assertStudentEnrolledInCourse } from './validation';
 import { getCourseContent } from './courseRepository';
+import { saveStudentProgressToSP } from '../../services/spDataService';
 
 function recordId(studentId: string, courseId: string): string {
   return `${studentId}::${courseId}`;
@@ -28,6 +29,7 @@ export function createProgress(studentId: string, courseId: string): StudentProg
   const record: StudentProgress = { id: recordId(studentId, courseId), studentId, courseId, createdAt: now, updatedAt: now, ...createEmptyProgressState() };
   state.progressRecords.push(record);
   commit();
+  saveStudentProgressToSP(record).catch(() => {});
   return record;
 }
 
@@ -45,6 +47,7 @@ export function updateProgress(studentId: string, courseId: string, updater: (p:
   const next: StudentProgress = { ...updater(existing), id: existing.id, studentId, courseId, createdAt: existing.createdAt, updatedAt: new Date().toISOString() };
   state.progressRecords[index] = next;
   commit();
+  saveStudentProgressToSP(next).catch(() => {});
   return next;
 }
 

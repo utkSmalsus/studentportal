@@ -1,14 +1,12 @@
 import * as React from 'react';
-import { Card, PageHeader, SectionTitle, MetricTile, ProgressBar, StatusPill, SecondaryButton } from '../../ui/Primitives';
+import { Card, PageHeader, SectionTitle, MetricTile, ProgressBar, StatusPill, SecondaryButton, LoadingState } from '../../ui/Primitives';
 import { ChartIcon, FlameIcon, CodeIcon, ClipboardIcon, AwardIcon } from '../../ui/icons';
 import { useAppState } from '../../state/AppStateContext';
 import * as progression from '../../state/engine/progression';
 import { profile } from '../../data/mockData';
 import { course, moduleDefs, courseOverallProgress, miniTaskStats, assessmentStats, codingStats } from '../../data/selectors';
 import { ModuleGroup } from '../../data/types';
-import * as rosterRepo from '../../admin/repository/rosterRepository';
-import * as mentorRepo from '../../admin/repository/mentorRepository';
-import * as githubRepo from '../../admin/repository/githubRepository';
+import { useStudent, useBatches, useMentor, useGitHubConnection, useGitHubRepositoryLink, useDisconnectGitHubAccount } from '../../hooks';
 
 const GROUP_LABEL: Record<ModuleGroup, string> = {
   Foundation: 'Foundation',
@@ -35,11 +33,18 @@ const Row: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value
 
 const ProfilePage: React.FC<{ userDisplayName: string; onRestartOnboarding?: () => void }> = ({ userDisplayName, onRestartOnboarding }) => {
   const { state: progress, studentId } = useAppState();
-  const student = rosterRepo.getStudent(studentId);
-  const batch = rosterRepo.listBatches().find((b) => b.id === student?.batchId);
-  const mentor = batch?.primaryMentorId ? mentorRepo.getMentor(batch.primaryMentorId) : undefined;
-  const connection = githubRepo.getConnection(studentId);
-  const repoLink = student ? githubRepo.getRepositoryLink(studentId, student.courseId) : undefined;
+  const { data: student, isLoading: isStudentLoading } = useStudent(studentId);
+  const { data: batches = [], isLoading: isBatchesLoading } = useBatches();
+  const batch = batches.find((b) => b.id === student?.batchId);
+  const { data: mentor } = useMentor(batch?.primaryMentorId || '');
+  const { data: connection } = useGitHubConnection(studentId);
+  const { data: repoLink } = useGitHubRepositoryLink(studentId, student?.courseId || '');
+  const disconnectMutation = useDisconnectGitHubAccount();
+
+  if (isStudentLoading || isBatchesLoading) {
+    return <LoadingState label="Loading profile..." />;
+  }
+
   const overallPercent = courseOverallProgress(progress);
   const current = progression.currentModule(course, moduleDefs, progress);
   const currentGroup = current?.group;
@@ -180,7 +185,7 @@ const ProfilePage: React.FC<{ userDisplayName: string; onRestartOnboarding?: () 
                   <a href={`https://github.com/${connection.username}`} target="_blank" rel="noreferrer">
                     <SecondaryButton className="text-xs px-3 py-1.5">Open GitHub</SecondaryButton>
                   </a>
-                  <SecondaryButton className="text-xs px-3 py-1.5" onClick={() => githubRepo.disconnectAccount(studentId)}>
+                  <SecondaryButton className="text-xs px-3 py-1.5" onClick={() => disconnectMutation.mutate(studentId)} disabled={disconnectMutation.isLoading}>
                     Disconnect
                   </SecondaryButton>
                 </div>

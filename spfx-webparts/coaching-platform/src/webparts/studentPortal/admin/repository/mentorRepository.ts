@@ -3,6 +3,7 @@
 // the spec) — nothing here duplicates mentor assignment onto individual students.
 import { state, commit } from './store';
 import { Mentor, MentorStatus, Batch, StudentRecord } from '../types';
+import { saveMentorToSP, saveBatchToSP } from '../../services/spDataService';
 import { assertMentorExists } from './validation';
 import * as submissionRepository from './submissionRepository';
 import * as projectSubmissionRepository from './projectSubmissionRepository';
@@ -19,6 +20,7 @@ export function createMentor(input: Omit<Mentor, 'id'>): Mentor {
   const mentor: Mentor = { ...input, id: `mentor-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}` };
   state.mentors.push(mentor);
   commit();
+  saveMentorToSP(mentor).catch(() => {});
   return mentor;
 }
 
@@ -27,6 +29,7 @@ export function updateMentor(id: string, patch: Partial<Omit<Mentor, 'id'>>): vo
   if (!m) return;
   Object.assign(m, patch);
   commit();
+  saveMentorToSP(m).catch(() => {});
 }
 
 export function setMentorStatus(id: string, status: MentorStatus): void {
@@ -43,6 +46,7 @@ export function assignMentorsToBatch(batchId: string, mentorIds: string[], prima
   batch.mentorIds = mentorIds;
   batch.primaryMentorId = primaryMentorId && mentorIds.indexOf(primaryMentorId) !== -1 ? primaryMentorId : mentorIds[0];
   commit();
+  saveBatchToSP(batch).catch(() => {});
 }
 
 export function getBatchesForMentor(mentorId: string): Batch[] {

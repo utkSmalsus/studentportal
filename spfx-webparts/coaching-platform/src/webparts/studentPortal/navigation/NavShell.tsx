@@ -82,27 +82,27 @@ const NavShell: React.FC<{
   );
 
   return (
-    <div className="font-sans text-slate-900 bg-slate-50 min-h-[720px]">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-white lg:hidden">
+    <div className="font-sans text-slate-900 bg-slate-50 h-full flex flex-col overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-white lg:hidden shrink-0">
         <span className="text-[15px] font-bold text-slate-900">Student Portal</span>
         <button onClick={() => setMobileOpen((v) => !v)} className="text-slate-600 border border-slate-200 rounded-md p-1.5" aria-expanded={mobileOpen}>
           {mobileOpen ? <CloseIcon className="w-5 h-5" /> : <MenuIcon className="w-5 h-5" />}
         </button>
       </div>
 
-      <div className="flex lg:min-h-[720px]">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         <nav
-          className={`w-full lg:w-[248px] shrink-0 bg-white border-b lg:border-b-0 lg:border-r border-slate-200 flex-col ${
+          className={`w-full lg:w-[248px] shrink-0 bg-white border-b lg:border-b-0 lg:border-r border-slate-200 flex-col h-full ${
             mobileOpen ? 'flex' : 'hidden lg:flex'
           }`}
         >
-          <div className="hidden lg:flex items-center gap-2.5 px-5 h-16 border-b border-slate-100">
+          <div className="hidden lg:flex items-center gap-2.5 px-5 h-16 border-b border-slate-100 shrink-0">
             <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-sm">S</div>
             <span className="text-[15px] font-bold text-slate-900">Student Portal</span>
           </div>
-          <div className="flex-1 overflow-auto px-3 pt-4 lg:pt-5">{navList}</div>
+          <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar px-3 pt-4 lg:pt-5">{navList}</div>
           {onOpenAdmin && (
-            <div className="px-3 pb-2">
+            <div className="px-3 pb-2 shrink-0">
               <button
                 onClick={onOpenAdmin}
                 className="w-full flex items-center gap-2.5 text-left px-3 py-2 rounded-lg text-[13px] font-semibold text-slate-500 hover:bg-slate-100"
@@ -112,7 +112,7 @@ const NavShell: React.FC<{
               </button>
             </div>
           )}
-          <div className="hidden lg:flex items-center gap-2.5 px-4 py-4 border-t border-slate-100">
+          <div className="hidden lg:flex items-center gap-2.5 px-4 py-4 border-t border-slate-100 shrink-0">
             <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold shrink-0">
               {userDisplayName.charAt(0)}
             </div>
@@ -122,8 +122,8 @@ const NavShell: React.FC<{
             </div>
           </div>
         </nav>
-        <main className="flex-1 min-w-0 px-5 sm:px-8 lg:px-10 py-7 lg:py-9">
-          <div className="max-w-[1280px] mx-auto">{children}</div>
+        <main className="flex-1 min-w-0 h-full overflow-y-auto px-5 sm:px-8 lg:px-10 py-7 lg:py-9">
+          <div className="max-w-[1280px] mx-auto pb-12">{children}</div>
         </main>
       </div>
     </div>

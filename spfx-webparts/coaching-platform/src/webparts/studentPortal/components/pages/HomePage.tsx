@@ -7,9 +7,7 @@ import * as progression from '../../state/engine/progression';
 import { course, moduleDefs, miniTasks, majorProject, courseOverallProgress, miniTaskStats, assessmentStats, getModuleById, getMiniTaskById } from '../../data/selectors';
 import { codingQuestions } from '../../data/mockData';
 import { ModuleGroup } from '../../data/types';
-import * as rosterRepo from '../../admin/repository/rosterRepository';
-import * as mentorRepo from '../../admin/repository/mentorRepository';
-import * as githubRepo from '../../admin/repository/githubRepository';
+import { useStudent, useBatches, useMentor, useGitHubConnection, useGitHubRepositoryLink } from '../../hooks';
 
 const GROUP_ORDER: ModuleGroup[] = ['Foundation', 'Programming', 'Frontend', 'Backend', 'Full Stack', 'Capstone'];
 const GROUP_LABEL: Record<ModuleGroup, string> = {
@@ -73,12 +71,13 @@ const Row: React.FC<{ label: string; value: string }> = ({ label, value }) => (
 );
 
 const HomeMentorGithubCard: React.FC<{ onNavigate: (r: Route) => void }> = ({ onNavigate }) => {
-  const { studentId } = useAppState();
-  const student = rosterRepo.getStudent(studentId);
-  const batch = rosterRepo.listBatches().find((b) => b.id === student?.batchId);
-  const mentor = batch?.primaryMentorId ? mentorRepo.getMentor(batch.primaryMentorId) : undefined;
-  const connection = githubRepo.getConnection(studentId);
-  const repoLink = student ? githubRepo.getRepositoryLink(studentId, student.courseId) : undefined;
+  const { studentId, courseId } = useAppState();
+  const { data: student } = useStudent(studentId);
+  const { data: batches = [] } = useBatches();
+  const batch = batches.find((b) => b.id === student?.batchId);
+  const { data: mentor } = useMentor(batch?.primaryMentorId || '');
+  const { data: connection } = useGitHubConnection(studentId);
+  const { data: repoLink } = useGitHubRepositoryLink(studentId, courseId);
 
   if (!mentor && !connection) return null;
 

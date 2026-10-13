@@ -1,11 +1,10 @@
 import * as React from 'react';
 import { useState } from 'react';
-import { PageHeader, Card, SectionTitle, ProgressBar, PrimaryButton, SecondaryButton, EmptyState, Tag, EvaluationRubric } from '../../ui/Primitives';
+import { PageHeader, Card, SectionTitle, ProgressBar, PrimaryButton, SecondaryButton, EmptyState, Tag, EvaluationRubric, LoadingState } from '../../ui/Primitives';
 import { CheckIcon, LockIcon, RocketIcon, ClockIcon, AlertIcon } from '../../ui/icons';
 import { useAppState } from '../../state/AppStateContext';
 import * as progression from '../../state/engine/progression';
-import * as courseRepo from '../../admin/repository/courseRepository';
-import * as githubRepo from '../../admin/repository/githubRepository';
+import { useCourseContent, useCourseMeta, useGitHubRepositoryLink, useRecordGitHubActivity } from '../../hooks';
 
 const TextField: React.FC<{ label: string; value: string; onChange: (v: string) => void; placeholder?: string }> = ({ label, value, onChange, placeholder }) => (
   <div>
@@ -21,10 +20,11 @@ const TextField: React.FC<{ label: string; value: string; onChange: (v: string) 
 
 const ProjectPage: React.FC = () => {
   const { state: progress, studentId, courseId, advanceMilestone, submitProject } = useAppState();
-  // Course-scoped content for THIS student's own course — never the mirrored
-  // "active" course (data/selectors), so a student in a different course from
-  // whoever the admin currently has open still sees their own Major Project.
-  const content = courseRepo.getCourseContent(courseId);
+  // Course-scoped content for THIS student's own course — loaded via async React Query hook
+  const { data: content, isLoading: isContentLoading } = useCourseContent(courseId);
+  const { data: courseMeta } = useCourseMeta(courseId);
+  const { data: repoLink } = useGitHubRepositoryLink(studentId, courseId);
+  const recordActivityMutation = useRecordGitHubActivity();
 
   const [expandedMilestone, setExpandedMilestone] = useState<string | undefined>();
   const [githubUrl, setGithubUrl] = useState('');
@@ -33,6 +33,10 @@ const ProjectPage: React.FC = () => {
   const [pullRequestUrl, setPullRequestUrl] = useState('');
   const [liveUrl, setLiveUrl] = useState('');
   const [docsUrl, setDocsUrl] = useState('');
+
+  if (isContentLoading) {
+    return <LoadingState label="Loading major project..." />;
+  }
 
   if (!content) {
     return <EmptyState title="Course content not found" description="This student's course could not be loaded." icon={<LockIcon className="w-5 h-5" />} />;
@@ -69,10 +73,9 @@ const ProjectPage: React.FC = () => {
   const showForm = status === 'Not Started' || status === 'Changes Requested';
   const isChangesRequested = status === 'Changes Requested';
 
-  const courseGithub = courseRepo.getCourseMeta(courseId)?.githubSettings;
+  const courseGithub = courseMeta?.githubSettings;
   const githubRequired = !!courseGithub?.enabled && !!courseGithub?.trainingRepositoryRequired;
   const showPullRequestField = !!courseGithub?.pullRequestRequired;
-  const repoLink = githubRepo.getRepositoryLink(studentId, courseId);
   const effectiveGithubUrl = repoLink ? `https://github.com/${repoLink.repositoryName}` : githubUrl;
   const canSubmit = githubRequired ? !!repoLink || !!githubUrl : true;
 
@@ -84,7 +87,13 @@ const ProjectPage: React.FC = () => {
       pullRequestUrl: pullRequestUrl || undefined,
     });
     if (repoLink) {
-      githubRepo.recordActivity(studentId, courseId, repoLink.repositoryName, 'push', { branch: branch || undefined, message: `Submit "${majorProject.title}"`, sha: commitSha || undefined });
+      recordActivityMutation.mutate({
+        studentId,
+        courseId,
+        repositoryName: repoLink.repositoryName,
+        action: 'push',
+        extra: { branch: branch || undefined, message: `Submit "${majorProject.title}"`, sha: commitSha || undefined },
+      });
     }
     setBranch('');
     setCommitSha('');

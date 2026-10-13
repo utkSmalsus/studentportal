@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { PageHeader, Card, SectionTitle } from '../../ui/Primitives';
-import * as mentorRepo from '../../admin/repository/mentorRepository';
+import { PageHeader, Card, SectionTitle, LoadingState } from '../../ui/Primitives';
+import { useMentor } from '../../hooks';
 
 const Row: React.FC<{ label: string; value: string }> = ({ label, value }) => (
   <div className="flex justify-between text-sm">
@@ -10,7 +10,12 @@ const Row: React.FC<{ label: string; value: string }> = ({ label, value }) => (
 );
 
 const MentorProfilePage: React.FC<{ mentorId: string }> = ({ mentorId }) => {
-  const mentor = mentorRepo.getMentor(mentorId);
+  const { data: mentor, isLoading } = useMentor(mentorId);
+
+  if (isLoading) {
+    return <LoadingState label="Loading profile..." />;
+  }
+
   if (!mentor) return null;
 
   return (

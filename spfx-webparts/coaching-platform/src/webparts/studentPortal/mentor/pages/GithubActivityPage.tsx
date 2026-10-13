@@ -1,17 +1,21 @@
 import * as React from 'react';
-import { PageHeader } from '../../ui/Primitives';
+import { PageHeader, LoadingState } from '../../ui/Primitives';
 import { AdminTable, AdminColumn } from '../../admin/ui/AdminPrimitives';
-import * as mentorRepo from '../../admin/repository/mentorRepository';
-import * as githubRepo from '../../admin/repository/githubRepository';
 import { GitHubActivityItem } from '../../admin/types';
+import { useStudentsForMentor, useRecentGitHubActivity } from '../../hooks';
 
 const ACTION_LABEL: Record<GitHubActivityItem['action'], string> = {
   push: 'Pushed a commit', commit: 'Committed', create_branch: 'Created a branch', open_pr: 'Opened a Pull Request', merge_pr: 'Merged a Pull Request',
 };
 
 const GithubActivityPage: React.FC<{ mentorId: string }> = ({ mentorId }) => {
-  const students = mentorRepo.getStudentsForMentor(mentorId);
-  const activity = githubRepo.listRecentActivity(students.map((s) => s.id), 50);
+  const { data: students = [], isLoading: isLoadingStudents } = useStudentsForMentor(mentorId);
+  const studentIds = React.useMemo(() => students.map((s) => s.id), [students]);
+  const { data: activity = [], isLoading: isLoadingActivity } = useRecentGitHubActivity(studentIds, 50);
+
+  if (isLoadingStudents || (studentIds.length > 0 && isLoadingActivity)) {
+    return <LoadingState label="Loading activity..." />;
+  }
 
   const columns: AdminColumn<GitHubActivityItem>[] = [
     { key: 'student', label: 'Student', render: (a) => students.find((s) => s.id === a.studentId)?.name || '—' },

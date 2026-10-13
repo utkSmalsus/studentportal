@@ -3,6 +3,7 @@
 // course's content stays mirrored into the student app's data/mockData.ts.
 import { state, commit, clone, buildEmptyCourse } from './store';
 import { CourseContent, CourseMeta, CourseStatus, ValidationIssue } from '../types';
+import { saveCourseToSP, deleteCourseFromSP } from '../../services/spDataService';
 
 export function listCourses(): CourseMeta[] {
   return Object.keys(state.courses).map((id) => state.courses[id].meta);
@@ -18,6 +19,13 @@ export function getCourseMeta(courseId: string): CourseMeta | undefined {
 
 export function getActiveCourseId(): string {
   return state.activeCourseId;
+}
+
+export function setActiveCourseId(courseId: string): void {
+  if (state.courses[courseId] && state.activeCourseId !== courseId) {
+    state.activeCourseId = courseId;
+    commit(courseId);
+  }
 }
 
 function slugify(title: string): string {
@@ -38,6 +46,7 @@ export function createCourse(input: { title: string; code: string; category?: st
   if (input.difficulty) content.meta.difficulty = input.difficulty;
   state.courses[id] = content;
   commit();
+  saveCourseToSP(content).catch(() => {});
   return content.meta;
 }
 
@@ -47,6 +56,7 @@ export function updateCourseMeta(courseId: string, patch: Partial<Omit<CourseMet
   Object.assign(content.meta, patch);
   if (patch.title) content.course.title = patch.title;
   commit(courseId);
+  saveCourseToSP(content).catch(() => {});
 }
 
 export function duplicateCourse(courseId: string, newTitle: string): CourseMeta | undefined {
@@ -143,6 +153,7 @@ export function duplicateCourse(courseId: string, newTitle: string): CourseMeta 
   state.questionBank.push(...bankCopies);
 
   commit();
+  saveCourseToSP(copy).catch(() => {});
   return copy.meta;
 }
 
@@ -205,4 +216,5 @@ export function deleteCourse(courseId: string): void {
   if (courseId === state.activeCourseId) return;
   delete state.courses[courseId];
   commit();
+  deleteCourseFromSP(courseId).catch(() => {});
 }

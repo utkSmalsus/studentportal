@@ -1,30 +1,43 @@
 import * as React from 'react';
 import { useState } from 'react';
-import { PageHeader, PrimaryButton, SecondaryButton } from '../../ui/Primitives';
+import { PageHeader, PrimaryButton, SecondaryButton, LoadingState } from '../../ui/Primitives';
 import { AdminTable, AdminColumn, StatusBadge, Drawer, FormField, Select } from '../ui/AdminPrimitives';
 import { PlusIcon, AlertIcon } from '../../ui/icons';
 import { SemanticColor } from '../../ui/statusMeta';
-import * as courseRepo from '../repository/courseRepository';
-import * as rosterRepo from '../repository/rosterRepository';
 import { Enrollment, EnrollmentStatus } from '../types';
+import { useCourses, useStudents, useBatches, useEnrollments, useEnrollStudent } from '../../hooks';
 
 const statusColor: Record<EnrollmentStatus, SemanticColor> = { active: 'green', completed: 'blue', withdrawn: 'red' };
 
 const EnrollmentsPage: React.FC = () => {
-  const courses = courseRepo.listCourses();
-  const students = rosterRepo.listStudents();
-  const batches = rosterRepo.listBatches();
-  const enrollments = rosterRepo.listEnrollments();
+  const { data: courses = [], isLoading: coursesLoading } = useCourses();
+  const { data: students = [], isLoading: studentsLoading } = useStudents();
+  const { data: batches = [], isLoading: batchesLoading } = useBatches();
+  const { data: enrollments = [], isLoading: enrollmentsLoading } = useEnrollments();
+  const enrollStudentMutation = useEnrollStudent();
 
   const [enrolling, setEnrolling] = useState(false);
-  const [studentId, setStudentId] = useState(students[0]?.id || '');
-  const [courseId, setCourseId] = useState(courses[0]?.id || '');
+  const [studentId, setStudentId] = useState('');
+  const [courseId, setCourseId] = useState('');
   const [batchId, setBatchId] = useState('');
   const [startDate, setStartDate] = useState('');
   const [expectedCompletion, setExpectedCompletion] = useState('');
 
-  const selectedStudent = students.find((s) => s.id === studentId);
-  const isSwitchingLiveCourse = !!selectedStudent?.isLiveDemoStudent && selectedStudent.courseId !== courseId;
+  const isLoading = coursesLoading || studentsLoading || batchesLoading || enrollmentsLoading;
+
+  // Set default form selections when opening
+  const openEnroll = (): void => {
+    setStudentId(students[0]?.id || '');
+    setCourseId(courses[0]?.id || '');
+    setBatchId('');
+    setStartDate(new Date().toISOString().slice(0, 10));
+    setExpectedCompletion('');
+    setEnrolling(true);
+  };
+
+  const selectedStudent = students.find((s) => s.id === (studentId || students[0]?.id));
+  const effectiveCourseId = courseId || courses[0]?.id || '';
+  const isSwitchingLiveCourse = !!selectedStudent?.isLiveDemoStudent && selectedStudent.courseId !== effectiveCourseId;
 
   const columns: AdminColumn<Enrollment>[] = [
     { key: 'student', label: 'Student', render: (e) => students.find((s) => s.id === e.studentId)?.name || '—' },
@@ -35,11 +48,35 @@ const EnrollmentsPage: React.FC = () => {
     { key: 'status', label: 'Status', render: (e) => <StatusBadge color={statusColor[e.status]}>{e.status}</StatusBadge> },
   ];
 
-  const handleEnroll = (): void => {
-    if (!studentId || !courseId || !startDate) return;
-    rosterRepo.enrollStudent({ studentId, courseId, batchId: batchId || undefined, startDate, expectedCompletion });
+  const handleEnroll = async (): Promise<void> => {
+    const activeStudentId = studentId || students[0]?.id;
+    const activeCourseId = courseId || courses[0]?.id;
+    if (!activeStudentId || !activeCourseId || !startDate) return;
+
+    await enrollStudentMutation.mutateAsync({
+      studentId: activeStudentId,
+      courseId: activeCourseId,
+      batchId: batchId || undefined,
+      startDate,
+      expectedCompletion,
+    });
     setEnrolling(false);
   };
+
+  if (isLoading) {
+    return (
+      <div>
+        <PageHeader
+          eyebrow="Students"
+          title="Enrollments"
+          subtitle="Enrolling a student assigns them a course and starts their journey from the first unlocked module."
+        />
+        <LoadingState label="Loading enrollments..." />
+      </div>
+    );
+  }
+
+  const isEnrolling = enrollStudentMutation.isLoading;
 
   return (
     <div>
@@ -48,7 +85,7 @@ const EnrollmentsPage: React.FC = () => {
         title="Enrollments"
         subtitle="Enrolling a student assigns them a course and starts their journey from the first unlocked module."
         action={
-          <PrimaryButton onClick={() => setEnrolling(true)}>
+          <PrimaryButton onClick={openEnroll} disabled={students.length === 0 || courses.length === 0}>
             <PlusIcon className="w-4 h-4" /> Enroll Student
           </PrimaryButton>
         }
@@ -62,16 +99,19 @@ const EnrollmentsPage: React.FC = () => {
         onClose={() => setEnrolling(false)}
         footer={
           <>
-            <SecondaryButton onClick={() => setEnrolling(false)}>Cancel</SecondaryButton>
-            <PrimaryButton onClick={handleEnroll} disabled={!studentId || !courseId || !startDate}>
-              Enroll
+            <SecondaryButton onClick={() => setEnrolling(false)} disabled={isEnrolling}>Cancel</SecondaryButton>
+            <PrimaryButton
+              onClick={handleEnroll}
+              disabled={(!studentId && !students[0]?.id) || (!courseId && !courses[0]?.id) || !startDate || isEnrolling}
+            >
+              {isEnrolling ? 'Enrolling...' : 'Enroll'}
             </PrimaryButton>
           </>
         }
       >
         <div className="space-y-4">
           <FormField label="Student">
-            <Select value={studentId} onChange={(e) => setStudentId(e.target.value)}>
+            <Select value={studentId || students[0]?.id || ''} onChange={(e) => setStudentId(e.target.value)}>
               {students.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
@@ -81,11 +121,8 @@ const EnrollmentsPage: React.FC = () => {
           </FormField>
           <FormField label="Course">
             <Select
-              value={courseId}
+              value={effectiveCourseId}
               onChange={(e) => {
-                // A batch belongs to one course — switching courses without
-                // clearing this would silently submit a batch from the
-                // student's PREVIOUS course selection.
                 setCourseId(e.target.value);
                 setBatchId('');
               }}
@@ -100,7 +137,7 @@ const EnrollmentsPage: React.FC = () => {
           <FormField label="Batch">
             <Select value={batchId} onChange={(e) => setBatchId(e.target.value)}>
               <option value="">—</option>
-              {batches.filter((b) => b.courseId === courseId).map((b) => (
+              {batches.filter((b) => b.courseId === effectiveCourseId).map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.name}
                 </option>
@@ -109,10 +146,20 @@ const EnrollmentsPage: React.FC = () => {
           </FormField>
           <div className="grid grid-cols-2 gap-4">
             <FormField label="Start Date">
-              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm" />
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm"
+              />
             </FormField>
             <FormField label="Expected Completion">
-              <input type="date" value={expectedCompletion} onChange={(e) => setExpectedCompletion(e.target.value)} className="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm" />
+              <input
+                type="date"
+                value={expectedCompletion}
+                onChange={(e) => setExpectedCompletion(e.target.value)}
+                className="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm"
+              />
             </FormField>
           </div>
 

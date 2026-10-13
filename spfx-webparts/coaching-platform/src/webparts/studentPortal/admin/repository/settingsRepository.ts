@@ -3,6 +3,7 @@
 // NotificationsAdminPage.tsx for where they're read back.
 import { state, commit } from './store';
 import { CertificateConfig, NotificationRule } from '../types';
+import { saveCertificateToSP } from '../../services/spDataService';
 
 export function listCertificates(): CertificateConfig[] {
   return state.certificates;
@@ -20,6 +21,10 @@ export function upsertCertificate(courseId: string, patch: Partial<Omit<Certific
     state.certificates.push({ courseId, name: '', prefix: '', minAssessmentScorePercent: 60, requireAllModulesComplete: true, template: 'Standard', ...patch });
   }
   commit();
+  const updated = state.certificates.find((c) => c.courseId === courseId);
+  if (updated) {
+    saveCertificateToSP(updated).catch(() => {});
+  }
 }
 
 export function listNotificationRules(): NotificationRule[] {

@@ -1,48 +1,28 @@
 import * as React from 'react';
 import { AdminRoute } from '../navigation/types';
-import { PageHeader, Card, SectionTitle, MetricTile } from '../../ui/Primitives';
+import { PageHeader, Card, SectionTitle, MetricTile, LoadingState } from '../../ui/Primitives';
 import { UsersIcon, BookIcon, BuildingIcon, ClipboardIcon, ChartIcon, AwardIcon, AlertIcon } from '../../ui/icons';
-import * as courseRepo from '../repository/courseRepository';
-import * as rosterRepo from '../repository/rosterRepository';
-import * as submissionRepo from '../repository/submissionRepository';
-import * as projectSubmissionRepo from '../repository/projectSubmissionRepository';
-import { getStudentProgressView } from '../repository/progressView';
+import { useAdminDashboardMetrics } from '../../hooks';
 
 const AdminDashboardPage: React.FC<{ onNavigate: (r: AdminRoute) => void }> = ({ onNavigate }) => {
-  const courses = courseRepo.listCourses();
-  const students = rosterRepo.listStudents();
-  const batches = rosterRepo.listBatches();
+  const { data, isLoading } = useAdminDashboardMetrics();
 
-  // One pass over the roster computing everything per-student — each scored
-  // against their OWN course, never a single "active" student's state, and
-  // never re-fetched per metric.
-  const rows = students
-    .map((student) => ({
-      student,
-      view: getStudentProgressView(student.id, student.courseId),
-      pendingMiniTasks: submissionRepo.listPendingSubmissions([student.id], student.courseId).length,
-      pendingProjects: projectSubmissionRepo.listPendingProjectSubmissions([student.id], student.courseId).length,
-    }))
-    .filter((r) => r.view);
+  if (isLoading || !data) {
+    return <LoadingState label="Loading dashboard..." />;
+  }
 
-  const pendingMiniTasks = rows.reduce((sum, r) => sum + r.pendingMiniTasks, 0);
-  const pendingProjects = rows.reduce((sum, r) => sum + r.pendingProjects, 0);
-
-  const assessmentsCompleted = rows.reduce((sum, { view }) => sum + Object.keys(view!.progress.assessments).filter((id) => view!.progress.assessments[id].attempts.length > 0).length, 0);
-  const overallProgress = rows.length > 0 ? Math.round(rows.reduce((sum, { view }) => sum + view!.overallPercent, 0) / rows.length) : 0;
-
-  const activeCourses = courses.filter((c) => c.status === 'published').length;
-  const activeBatches = batches.filter((b) => b.status === 'active').length;
-
-  const behindStudents = students.filter((s) => s.status === 'paused').length;
-
-  const recentActivity = rows
-    .reduce<{ id: string; message: string; date: string }[]>(
-      (all, { student, view }) => all.concat(view!.progress.notifications.slice(0, 2).map((n) => ({ id: n.id, message: `${student.name}: ${n.message}`, date: n.date }))),
-      []
-    )
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, 6);
+  const {
+    courses,
+    students,
+    pendingMiniTasks,
+    pendingProjects,
+    assessmentsCompleted,
+    overallProgress,
+    activeCourses,
+    activeBatches,
+    behindStudents,
+    recentActivity,
+  } = data;
 
   return (
     <div>

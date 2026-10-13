@@ -1,25 +1,39 @@
 import * as React from 'react';
 import { useState } from 'react';
-import { PageHeader, PrimaryButton, SecondaryButton } from '../../ui/Primitives';
+import { PageHeader, PrimaryButton, SecondaryButton, LoadingState } from '../../ui/Primitives';
 import { AdminTable, AdminColumn, StatusBadge, Drawer, FormField, TextInput, Select } from '../ui/AdminPrimitives';
 import { PlusIcon } from '../../ui/icons';
 import { SemanticColor } from '../../ui/statusMeta';
-import * as courseRepo from '../repository/courseRepository';
-import * as rosterRepo from '../repository/rosterRepository';
-import * as mentorRepo from '../repository/mentorRepository';
 import { Batch, BatchStatus } from '../types';
+import { useCourses, useBatches, useStudents, useMentors, useCreateBatch, useUpdateBatch } from '../../hooks';
 
 const statusColor: Record<BatchStatus, SemanticColor> = { upcoming: 'blue', active: 'green', completed: 'gray' };
 
-const emptyDraft = (courseId: string): Omit<Batch, 'id'> => ({ name: '', courseId, startDate: '', endDate: '', scheduleDays: [], scheduleTime: '', mentorIds: [], primaryMentorId: undefined, status: 'upcoming' });
+const emptyDraft = (courseId: string): Omit<Batch, 'id'> => ({
+  name: '',
+  courseId,
+  startDate: '',
+  endDate: '',
+  scheduleDays: [],
+  scheduleTime: '',
+  mentorIds: [],
+  primaryMentorId: undefined,
+  status: 'upcoming',
+});
 
 const BatchesPage: React.FC = () => {
-  const courses = courseRepo.listCourses();
-  const batches = rosterRepo.listBatches();
-  const students = rosterRepo.listStudents();
-  const mentors = mentorRepo.listMentors();
+  const { data: courses = [], isLoading: coursesLoading } = useCourses();
+  const { data: batches = [], isLoading: batchesLoading } = useBatches();
+  const { data: students = [], isLoading: studentsLoading } = useStudents();
+  const { data: mentors = [], isLoading: mentorsLoading } = useMentors();
+
+  const createBatchMutation = useCreateBatch();
+  const updateBatchMutation = useUpdateBatch();
+
   const [editing, setEditing] = useState<Batch | undefined>();
   const [draft, setDraft] = useState<Omit<Batch, 'id'> | undefined>();
+
+  const isLoading = coursesLoading || batchesLoading || studentsLoading || mentorsLoading;
 
   const openCreate = (): void => setDraft(emptyDraft(courses[0]?.id || ''));
   const openEdit = (b: Batch): void => {
@@ -30,10 +44,14 @@ const BatchesPage: React.FC = () => {
     setEditing(undefined);
     setDraft(undefined);
   };
-  const save = (): void => {
+
+  const save = async (): Promise<void> => {
     if (!draft || !draft.name.trim()) return;
-    if (editing) rosterRepo.updateBatch(editing.id, draft);
-    else rosterRepo.createBatch(draft);
+    if (editing) {
+      await updateBatchMutation.mutateAsync({ id: editing.id, patch: draft });
+    } else {
+      await createBatchMutation.mutateAsync(draft);
+    }
     closeDrawer();
   };
 
@@ -46,6 +64,17 @@ const BatchesPage: React.FC = () => {
     { key: 'students', label: 'Students', render: (b) => students.filter((s) => s.batchId === b.id).length },
     { key: 'status', label: 'Status', render: (b) => <StatusBadge color={statusColor[b.status]}>{b.status}</StatusBadge> },
   ];
+
+  if (isLoading) {
+    return (
+      <div>
+        <PageHeader eyebrow="Students" title="Batches" subtitle="Cohorts running a course on a shared schedule." />
+        <LoadingState label="Loading batches..." />
+      </div>
+    );
+  }
+
+  const isSaving = createBatchMutation.isLoading || updateBatchMutation.isLoading;
 
   return (
     <div>
@@ -68,9 +97,9 @@ const BatchesPage: React.FC = () => {
         onClose={closeDrawer}
         footer={
           <>
-            <SecondaryButton onClick={closeDrawer}>Cancel</SecondaryButton>
-            <PrimaryButton onClick={save} disabled={!draft?.name.trim()}>
-              Save
+            <SecondaryButton onClick={closeDrawer} disabled={isSaving}>Cancel</SecondaryButton>
+            <PrimaryButton onClick={save} disabled={!draft?.name.trim() || isSaving}>
+              {isSaving ? 'Saving...' : 'Save'}
             </PrimaryButton>
           </>
         }

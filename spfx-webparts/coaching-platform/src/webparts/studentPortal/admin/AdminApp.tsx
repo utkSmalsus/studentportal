@@ -20,16 +20,35 @@ import ReportsPage from './pages/ReportsPage';
 import CertificatesAdminPage from './pages/CertificatesAdminPage';
 import NotificationsAdminPage from './pages/NotificationsAdminPage';
 import SettingsPage from './pages/SettingsPage';
-import { useAdminStoreVersion } from './hooks';
+import { useCurrentUserRole } from '../hooks';
+import { AccessDeniedState } from '../ui/AccessDeniedState';
 
-const AdminApp: React.FC<{ userDisplayName: string; onExitAdmin: () => void; onPreviewAsStudent: (courseId: string) => void; onOpenMentorPortal: () => void }> = ({
+const AdminApp: React.FC<{
+  userDisplayName: string;
+  onExitAdmin: () => void;
+  onPreviewAsStudent: (courseId: string) => void;
+  onOpenMentorPortal: () => void;
+}> = ({
   userDisplayName,
   onExitAdmin,
   onPreviewAsStudent,
   onOpenMentorPortal,
 }) => {
-  useAdminStoreVersion();
+  const { data: roleContext, isLoading } = useCurrentUserRole();
   const [route, setRoute] = useState<AdminRoute>({ view: 'dashboard' });
+
+  // Security guard: verify that the user possesses verified Admin privileges
+  if (!isLoading && roleContext && !roleContext.isAdmin) {
+    return (
+      <AccessDeniedState
+        title="Unauthorized Access"
+        description="You do not have administrative privileges to access the Coaching Center Admin Portal."
+        userDisplayName={userDisplayName}
+        userEmail={roleContext.email}
+        onRetry={onExitAdmin}
+      />
+    );
+  }
 
   const renderPage = (): React.ReactElement | null => {
     switch (route.view) {
@@ -79,7 +98,13 @@ const AdminApp: React.FC<{ userDisplayName: string; onExitAdmin: () => void; onP
   };
 
   return (
-    <AdminLayout route={route} onNavigate={setRoute} userDisplayName={userDisplayName} onExitAdmin={onExitAdmin} onOpenMentorPortal={onOpenMentorPortal}>
+    <AdminLayout
+      route={route}
+      onNavigate={setRoute}
+      userDisplayName={userDisplayName}
+      onExitAdmin={onExitAdmin}
+      onOpenMentorPortal={onOpenMentorPortal}
+    >
       {renderPage()}
     </AdminLayout>
   );

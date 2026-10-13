@@ -1,11 +1,21 @@
 import * as React from 'react';
-import { useState } from 'react';
-import { Card, PrimaryButton, SecondaryButton, ProgressBar, StatusPill } from '../../ui/Primitives';
-import * as courseRepo from '../../admin/repository/courseRepository';
-import * as rosterRepo from '../../admin/repository/rosterRepository';
-import * as mentorRepo from '../../admin/repository/mentorRepository';
-import * as githubRepo from '../../admin/repository/githubRepository';
-import { CourseMeta } from '../../admin/types';
+import { useState, useEffect } from 'react';
+import { Card, PrimaryButton, SecondaryButton, ProgressBar, StatusPill, LoadingState } from '../../ui/Primitives';
+import {
+  useStudent,
+  useCourses,
+  useCourseMeta,
+  useBatches,
+  useMentor,
+  useGitHubConnection,
+  useGitHubRepositories,
+  useGitHubRepositoryLink,
+  useUpdateStudent,
+  useEnrollStudent,
+  useConnectGitHubAccount,
+  useCreateGitHubRepository,
+  useLinkExistingGitHubRepository,
+} from '../../hooks';
 
 const STEPS = ['Personal Information', 'Course & Batch', 'Mentor', 'GitHub', 'Repository', 'Confirmation'];
 
@@ -31,32 +41,61 @@ const StepShell: React.FC<{ step: number; total: number; title: string; children
 const fieldClass = 'w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400';
 
 const OnboardingPage: React.FC<{ studentId: string; onComplete: () => void }> = ({ studentId, onComplete }) => {
-  const student = rosterRepo.getStudent(studentId);
-  const publishedCourses = courseRepo.listCourses().filter((c) => c.status === 'published');
+  const { data: student, isLoading: isStudentLoading } = useStudent(studentId);
+  const { data: allCourses = [], isLoading: isCoursesLoading } = useCourses();
+  const publishedCourses = allCourses.filter((c) => c.status === 'published');
 
   const [step, setStep] = useState(0);
-  const [name, setName] = useState(student?.name || '');
-  const [email, setEmail] = useState(student?.email || '');
-  const [phone, setPhone] = useState(student?.phone || '');
-  const [courseId, setCourseId] = useState(student?.courseId || publishedCourses[0]?.id || '');
-  const [batchId, setBatchId] = useState(student?.batchId || '');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [courseId, setCourseId] = useState('');
+  const [batchId, setBatchId] = useState('');
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
   const [githubUsername, setGithubUsername] = useState('');
   const [repoChoice, setRepoChoice] = useState<'existing' | 'new'>('new');
   const [existingRepo, setExistingRepo] = useState('');
   const [newRepoName, setNewRepoName] = useState('mern-training');
 
+  useEffect(() => {
+    if (student) {
+      if (!name) setName(student.name || '');
+      if (!email) setEmail(student.email || '');
+      if (!phone && student.phone) setPhone(student.phone);
+      if (!courseId) setCourseId(student.courseId || publishedCourses[0]?.id || '');
+      if (!batchId && student.batchId) setBatchId(student.batchId);
+    } else if (publishedCourses.length > 0 && !courseId) {
+      setCourseId(publishedCourses[0].id);
+    }
+  }, [student, publishedCourses]);
+
+  const { data: courseMeta } = useCourseMeta(courseId);
+  const { data: allBatches = [] } = useBatches();
+  const batches = allBatches.filter((b) => b.courseId === courseId);
+  const selectedBatch = batches.find((b) => b.id === batchId);
+  const { data: mentor } = useMentor(selectedBatch?.primaryMentorId || '');
+  const { data: connection } = useGitHubConnection(studentId);
+  const { data: existingRepos = [] } = useGitHubRepositories(studentId);
+  const { data: repoLink } = useGitHubRepositoryLink(studentId, courseId);
+
+  const updateStudentMutation = useUpdateStudent();
+  const enrollStudentMutation = useEnrollStudent();
+  const connectGitHubMutation = useConnectGitHubAccount();
+  const createRepoMutation = useCreateGitHubRepository();
+  const linkRepoMutation = useLinkExistingGitHubRepository();
+
+  if (isStudentLoading || isCoursesLoading) {
+    return (
+      <div className="font-sans text-slate-900 bg-slate-50 min-h-[720px] px-5 py-20">
+        <LoadingState label="Loading onboarding..." />
+      </div>
+    );
+  }
+
   if (!student) return null;
 
-  const courseMeta: CourseMeta | undefined = courseRepo.getCourseMeta(courseId);
   const githubEnabled = !!courseMeta?.githubSettings.enabled;
-  const githubRequired = githubEnabled && courseMeta!.githubSettings.requiredForOnboarding;
-  const batches = rosterRepo.listBatches().filter((b) => b.courseId === courseId);
-  const selectedBatch = batches.find((b) => b.id === batchId);
-  const mentor = selectedBatch?.primaryMentorId ? mentorRepo.getMentor(selectedBatch.primaryMentorId) : undefined;
-  const connection = githubRepo.getConnection(studentId);
-  const existingRepos = githubRepo.listRepositories(studentId);
-  const repoLink = githubRepo.getRepositoryLink(studentId, courseId);
+  const githubRequired = githubEnabled && !!courseMeta?.githubSettings.requiredForOnboarding;
 
   // Skip the GitHub/Repository steps entirely for a course that doesn't use GitHub.
   const effectiveSteps = githubEnabled ? STEPS : STEPS.filter((s) => s !== 'GitHub' && s !== 'Repository');
@@ -74,9 +113,9 @@ const OnboardingPage: React.FC<{ studentId: string; onComplete: () => void }> = 
     setStep(Math.max(0, s));
   };
 
-  const finish = (): void => {
-    rosterRepo.updateStudent(studentId, { name, email, phone, courseId, batchId, onboardingComplete: true });
-    rosterRepo.enrollStudent({ studentId, courseId, batchId, startDate, expectedCompletion: startDate });
+  const finish = async (): Promise<void> => {
+    await updateStudentMutation.mutateAsync({ id: studentId, patch: { name, email, phone, courseId, batchId, onboardingComplete: true } });
+    await enrollStudentMutation.mutateAsync({ studentId, courseId, batchId, startDate, expectedCompletion: startDate });
     onComplete();
   };
 
@@ -191,7 +230,7 @@ const OnboardingPage: React.FC<{ studentId: string; onComplete: () => void }> = 
             ) : (
               <div className="space-y-3">
                 <input className={fieldClass} value={githubUsername} onChange={(e) => setGithubUsername(e.target.value)} placeholder="Your GitHub username" />
-                <PrimaryButton onClick={() => githubRepo.connectAccount(studentId, githubUsername || `${name.toLowerCase().replace(/\s+/g, '-')}`)} disabled={!githubUsername.trim()}>
+                <PrimaryButton onClick={() => connectGitHubMutation.mutate({ studentId, username: githubUsername || `${name.toLowerCase().replace(/\s+/g, '-')}` })} disabled={!githubUsername.trim() || connectGitHubMutation.isLoading}>
                   Connect GitHub
                 </PrimaryButton>
               </div>
@@ -234,7 +273,7 @@ const OnboardingPage: React.FC<{ studentId: string; onComplete: () => void }> = 
                 {repoChoice === 'new' ? (
                   <div className="space-y-2">
                     <input className={fieldClass} value={newRepoName} onChange={(e) => setNewRepoName(e.target.value)} />
-                    <PrimaryButton onClick={() => githubRepo.createRepository(studentId, courseId, newRepoName)} disabled={!newRepoName.trim()}>
+                    <PrimaryButton onClick={() => createRepoMutation.mutate({ studentId, courseId, name: newRepoName })} disabled={!newRepoName.trim() || createRepoMutation.isLoading}>
                       Create Repository
                     </PrimaryButton>
                   </div>
@@ -248,7 +287,7 @@ const OnboardingPage: React.FC<{ studentId: string; onComplete: () => void }> = 
                         </option>
                       ))}
                     </select>
-                    <PrimaryButton onClick={() => githubRepo.linkExistingRepository(studentId, courseId, existingRepo)} disabled={!existingRepo}>
+                    <PrimaryButton onClick={() => linkRepoMutation.mutate({ studentId, courseId, repositoryName: existingRepo })} disabled={!existingRepo || linkRepoMutation.isLoading}>
                       Link Repository
                     </PrimaryButton>
                   </div>
@@ -258,7 +297,7 @@ const OnboardingPage: React.FC<{ studentId: string; onComplete: () => void }> = 
           </StepShell>
           <div className="max-w-xl mx-auto flex justify-between -mt-4">
             <SecondaryButton onClick={back}>Back</SecondaryButton>
-            <PrimaryButton onClick={next} disabled={courseMeta!.githubSettings.trainingRepositoryRequired && !repoLink}>
+            <PrimaryButton onClick={next} disabled={!!courseMeta?.githubSettings.trainingRepositoryRequired && !repoLink}>
               Continue
             </PrimaryButton>
           </div>
@@ -269,7 +308,7 @@ const OnboardingPage: React.FC<{ studentId: string; onComplete: () => void }> = 
         <>
           <StepShell step={effectiveSteps.length - 1} total={effectiveSteps.length} title="Confirmation" footer={<div />}>
             <dl className="space-y-3 text-sm">
-              <div className="flex justify-between"><dt className="text-slate-400">Course</dt><dd className="font-semibold text-slate-900">{courseRepo.getCourseMeta(courseId)?.title}</dd></div>
+              <div className="flex justify-between"><dt className="text-slate-400">Course</dt><dd className="font-semibold text-slate-900">{courseMeta?.title || '—'}</dd></div>
               <div className="flex justify-between"><dt className="text-slate-400">Batch</dt><dd className="font-semibold text-slate-900">{selectedBatch?.name || '—'}</dd></div>
               <div className="flex justify-between"><dt className="text-slate-400">Mentor</dt><dd className="font-semibold text-slate-900">{mentor?.name || '—'}</dd></div>
               {githubEnabled && (
@@ -282,7 +321,7 @@ const OnboardingPage: React.FC<{ studentId: string; onComplete: () => void }> = 
           </StepShell>
           <div className="max-w-xl mx-auto flex justify-between -mt-4">
             <SecondaryButton onClick={back}>Back</SecondaryButton>
-            <PrimaryButton onClick={finish}>Complete Onboarding</PrimaryButton>
+            <PrimaryButton onClick={finish} disabled={updateStudentMutation.isLoading || enrollStudentMutation.isLoading}>Complete Onboarding</PrimaryButton>
           </div>
         </>
       )}

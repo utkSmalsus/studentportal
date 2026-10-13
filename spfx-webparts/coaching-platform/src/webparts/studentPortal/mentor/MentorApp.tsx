@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import MentorLayout from './MentorLayout';
 import { MentorRoute } from './navigation/types';
 import MentorDashboardPage from './pages/MentorDashboardPage';
@@ -9,14 +9,39 @@ import MentorReviewPage from './pages/MentorReviewPage';
 import GithubActivityPage from './pages/GithubActivityPage';
 import MentorStudentDetailPage from './pages/MentorStudentDetailPage';
 import MentorProfilePage from './pages/MentorProfilePage';
-import { useAdminStoreVersion } from '../admin/hooks';
-import * as mentorRepo from '../admin/repository/mentorRepository';
+import { LoadingState } from '../ui/Primitives';
+import { useMentors, useCurrentUserRole } from '../hooks';
 
-const MentorApp: React.FC<{ onExitMentor: () => void }> = ({ onExitMentor }) => {
-  useAdminStoreVersion();
-  const mentors = mentorRepo.listMentors();
-  const [mentorId, setMentorId] = useState(mentors[0]?.id || '');
+interface MentorAppProps {
+  onExitMentor?: () => void;
+  defaultMentorId?: string;
+  isAdmin?: boolean;
+}
+
+const MentorApp: React.FC<MentorAppProps> = ({
+  onExitMentor,
+  defaultMentorId,
+  isAdmin: propIsAdmin,
+}) => {
+  const { data: roleContext } = useCurrentUserRole();
+  const isAdmin = propIsAdmin ?? !!roleContext?.isAdmin;
+  const lockedMentorId = defaultMentorId || roleContext?.mentorId;
+
+  const { data: mentors = [], isLoading } = useMentors();
+  const [mentorId, setMentorId] = useState<string>(lockedMentorId || '');
   const [route, setRoute] = useState<MentorRoute>({ view: 'dashboard' });
+
+  useEffect(() => {
+    if (lockedMentorId) {
+      setMentorId(lockedMentorId);
+    } else if (!mentorId && mentors.length > 0) {
+      setMentorId(mentors[0].id);
+    }
+  }, [lockedMentorId, mentors, mentorId]);
+
+  if (isLoading) {
+    return <LoadingState label="Loading mentor portal..." />;
+  }
 
   const renderPage = (): React.ReactElement | null => {
     if (!mentorId) return null;
@@ -42,7 +67,14 @@ const MentorApp: React.FC<{ onExitMentor: () => void }> = ({ onExitMentor }) => 
   };
 
   return (
-    <MentorLayout route={route} onNavigate={setRoute} mentorId={mentorId} onChangeMentor={setMentorId} onExitMentor={onExitMentor}>
+    <MentorLayout
+      route={route}
+      onNavigate={setRoute}
+      mentorId={mentorId}
+      onChangeMentor={isAdmin ? setMentorId : () => {}}
+      allowMentorSwitch={isAdmin}
+      onExitMentor={onExitMentor}
+    >
       {renderPage()}
     </MentorLayout>
   );

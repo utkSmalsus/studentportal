@@ -1,42 +1,17 @@
 import * as React from 'react';
 import { MentorRoute } from '../navigation/types';
-import { PageHeader, Card, SectionTitle, MetricTile } from '../../ui/Primitives';
+import { PageHeader, Card, SectionTitle, MetricTile, LoadingState } from '../../ui/Primitives';
 import { UsersIcon, BuildingIcon, ClipboardIcon, AlertIcon } from '../../ui/icons';
-import * as mentorRepo from '../../admin/repository/mentorRepository';
-import * as courseRepo from '../../admin/repository/courseRepository';
-import * as githubRepo from '../../admin/repository/githubRepository';
-import * as submissionRepo from '../../admin/repository/submissionRepository';
-import * as projectSubmissionRepo from '../../admin/repository/projectSubmissionRepository';
+import { useMentorDashboard } from '../../hooks';
 
 const MentorDashboardPage: React.FC<{ mentorId: string; onNavigate: (r: MentorRoute) => void }> = ({ mentorId, onNavigate }) => {
-  const students = mentorRepo.getStudentsForMentor(mentorId);
-  const batches = mentorRepo.getBatchesForMentor(mentorId);
-  const courses = courseRepo.listCourses();
-  const pending = students.reduce<{ id: string; studentId: string; courseId: string; title: string; submittedAt: string }[]>(
-    (rows, s) =>
-      rows.concat(
-        submissionRepo.listPendingSubmissions([s.id], s.courseId).map((sub) => ({
-          id: sub.id,
-          studentId: sub.studentId,
-          courseId: sub.courseId,
-          title: courseRepo.getCourseContent(sub.courseId)?.miniTasks.find((t) => t.id === sub.taskId)?.title || sub.taskId,
-          submittedAt: sub.submittedAt,
-        })),
-        projectSubmissionRepo.listPendingProjectSubmissions([s.id], s.courseId).map((sub) => ({
-          id: sub.id,
-          studentId: sub.studentId,
-          courseId: sub.courseId,
-          title: courseRepo.getCourseContent(sub.courseId)?.majorProject.title || 'Major Project',
-          submittedAt: sub.submittedAt,
-        }))
-      ),
-    []
-  );
+  const { data, isLoading } = useMentorDashboard(mentorId);
 
-  const behind = students.filter((s) => s.status === 'paused');
-  // Every one of the mentor's students, not just the single live demo
-  // session — a mentor with several students must see all of their activity.
-  const recentActivity = githubRepo.listRecentActivity(students.map((s) => s.id), 5);
+  if (isLoading || !data) {
+    return <LoadingState label="Loading dashboard..." />;
+  }
+
+  const { students, batches, courses, pending, behind, recentActivity } = data;
 
   return (
     <div>

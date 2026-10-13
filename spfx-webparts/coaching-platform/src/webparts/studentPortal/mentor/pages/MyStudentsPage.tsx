@@ -1,29 +1,24 @@
 import * as React from 'react';
 import { useState } from 'react';
 import { MentorRoute } from '../navigation/types';
-import { PageHeader } from '../../ui/Primitives';
+import { PageHeader, LoadingState } from '../../ui/Primitives';
 import { AdminTable, AdminColumn, StatusBadge, Select } from '../../admin/ui/AdminPrimitives';
 import { SemanticColor } from '../../ui/statusMeta';
-import * as mentorRepo from '../../admin/repository/mentorRepository';
-import * as courseRepo from '../../admin/repository/courseRepository';
-import { getStudentProgressView } from '../../admin/repository/progressView';
 import { StudentRecord, StudentStatus } from '../../admin/types';
+import { useMentorStudentsProgress } from '../../hooks';
 
 const statusColor: Record<StudentStatus, SemanticColor> = { active: 'green', paused: 'amber', completed: 'blue', dropped: 'red' };
 
 const MyStudentsPage: React.FC<{ mentorId: string; onNavigate: (r: MentorRoute) => void }> = ({ mentorId, onNavigate }) => {
-  const courses = courseRepo.listCourses();
-  const allStudents = mentorRepo.getStudentsForMentor(mentorId);
+  const { data, isLoading } = useMentorStudentsProgress(mentorId);
   const [statusFilter, setStatusFilter] = useState<StudentStatus | ''>('');
 
-  const students = statusFilter ? allStudents.filter((s) => s.status === statusFilter) : allStudents;
+  if (isLoading || !data) {
+    return <LoadingState label="Loading students..." />;
+  }
 
-  // Fetched once per student, not once per column — each cell below is a
-  // cheap lookup into this instead of its own getStudentProgressView call.
-  const viewByStudentId: Record<string, ReturnType<typeof getStudentProgressView>> = {};
-  allStudents.forEach((s) => {
-    viewByStudentId[s.id] = getStudentProgressView(s.id, s.courseId);
-  });
+  const { courses, allStudents, viewByStudentId } = data;
+  const students = statusFilter ? allStudents.filter((s) => s.status === statusFilter) : allStudents;
 
   const columns: AdminColumn<StudentRecord>[] = [
     { key: 'name', label: 'Student', render: (s) => <span className="font-semibold text-slate-900">{s.name}</span> },

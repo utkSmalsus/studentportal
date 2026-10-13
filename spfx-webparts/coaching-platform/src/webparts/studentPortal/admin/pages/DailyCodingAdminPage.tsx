@@ -1,26 +1,68 @@
 import * as React from 'react';
 import { useState } from 'react';
-import { PageHeader, PrimaryButton, SecondaryButton } from '../../ui/Primitives';
+import { PageHeader, PrimaryButton, SecondaryButton, LoadingState } from '../../ui/Primitives';
 import { AdminTable, AdminColumn, StatusBadge, Drawer, FormField, TextInput, TextArea, Select, ConfirmDialog } from '../ui/AdminPrimitives';
 import { PlusIcon, TrashIcon, CopyIcon } from '../../ui/icons';
 import { SemanticColor } from '../../ui/statusMeta';
-import * as courseRepo from '../repository/courseRepository';
-import * as contentRepo from '../repository/contentRepository';
 import { CodingQuestionDef, Difficulty } from '../../data/types';
+import {
+  useCourses,
+  useCourseContent,
+  useCreateCodingQuestion,
+  useUpdateCodingQuestion,
+  useDeleteCodingQuestion,
+  useDuplicateCodingQuestion,
+} from '../../hooks';
 
 const difficultyColor: Record<Difficulty, SemanticColor> = { Beginner: 'green', Intermediate: 'amber', Advanced: 'red' };
 
 const emptyDraft = (courseId: string, day: number): Omit<CodingQuestionDef, 'id'> => ({
-  scope: 'course', courseId, day, title: '', difficulty: 'Beginner', topic: '', tags: [], problemStatement: '', exampleInput: '', exampleOutput: '', constraints: [], hints: [], testCasesTotal: 5, keywordChecks: [],
+  scope: 'course',
+  courseId,
+  day,
+  title: '',
+  difficulty: 'Beginner',
+  topic: '',
+  tags: [],
+  problemStatement: '',
+  exampleInput: '',
+  exampleOutput: '',
+  constraints: [],
+  hints: [],
+  testCasesTotal: 5,
+  keywordChecks: [],
 });
 
 const DailyCodingAdminPage: React.FC = () => {
-  const courses = courseRepo.listCourses();
-  const [courseId, setCourseId] = useState(courses[0]?.id || '');
-  const content = courseRepo.getCourseContent(courseId);
+  const { data: courses = [], isLoading: coursesLoading } = useCourses();
+  const [selectedCourseId, setSelectedCourseId] = useState('');
+
+  const courseId = selectedCourseId || courses[0]?.id || '';
+  const { data: content, isLoading: contentLoading } = useCourseContent(courseId);
+
+  const createQuestionMutation = useCreateCodingQuestion();
+  const updateQuestionMutation = useUpdateCodingQuestion();
+  const deleteQuestionMutation = useDeleteCodingQuestion();
+  const duplicateQuestionMutation = useDuplicateCodingQuestion();
+
   const [editing, setEditing] = useState<CodingQuestionDef | undefined>();
   const [draft, setDraft] = useState<Omit<CodingQuestionDef, 'id'> | undefined>();
   const [deleteTarget, setDeleteTarget] = useState<CodingQuestionDef | undefined>();
+
+  const isLoading = coursesLoading || (!!courseId && contentLoading);
+
+  if (isLoading) {
+    return (
+      <div>
+        <PageHeader
+          eyebrow="Content"
+          title="Daily Coding Scheduler"
+          subtitle="One coding challenge per scheduled day — independent from module progression, but a mandatory gate alongside it."
+        />
+        <LoadingState label="Loading daily coding challenges..." />
+      </div>
+    );
+  }
 
   if (!content) return null;
   const questions = content.codingQuestions;
@@ -34,10 +76,14 @@ const DailyCodingAdminPage: React.FC = () => {
     setEditing(undefined);
     setDraft(undefined);
   };
-  const save = (): void => {
+
+  const save = async (): Promise<void> => {
     if (!draft || !draft.title.trim()) return;
-    if (editing) contentRepo.updateCodingQuestion(courseId, editing.id, draft);
-    else contentRepo.createCodingQuestion(courseId, draft);
+    if (editing) {
+      await updateQuestionMutation.mutateAsync({ courseId, id: editing.id, patch: draft });
+    } else {
+      await createQuestionMutation.mutateAsync({ courseId, input: draft });
+    }
     closeDrawer();
   };
 
@@ -53,16 +99,26 @@ const DailyCodingAdminPage: React.FC = () => {
       className: 'text-right',
       render: (q) => (
         <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-          <button onClick={() => contentRepo.duplicateCodingQuestion(courseId, q.id)} className="text-slate-300 hover:text-slate-600" title="Duplicate">
+          <button
+            onClick={() => duplicateQuestionMutation.mutate({ courseId, id: q.id })}
+            className="text-slate-300 hover:text-slate-600"
+            title="Duplicate"
+          >
             <CopyIcon className="w-3.5 h-3.5" />
           </button>
-          <button onClick={() => setDeleteTarget(q)} className="text-slate-300 hover:text-red-500" title="Delete">
+          <button
+            onClick={() => setDeleteTarget(q)}
+            className="text-slate-300 hover:text-red-500"
+            title="Delete"
+          >
             <TrashIcon className="w-3.5 h-3.5" />
           </button>
         </div>
       ),
     },
   ];
+
+  const isSaving = createQuestionMutation.isLoading || updateQuestionMutation.isLoading;
 
   return (
     <div>
@@ -78,7 +134,7 @@ const DailyCodingAdminPage: React.FC = () => {
       />
 
       <div className="mb-5">
-        <Select value={courseId} onChange={(e) => setCourseId(e.target.value)} className="max-w-[260px]">
+        <Select value={courseId} onChange={(e) => setSelectedCourseId(e.target.value)} className="max-w-[260px]">
           {courses.map((c) => (
             <option key={c.id} value={c.id}>
               {c.title}
@@ -95,9 +151,11 @@ const DailyCodingAdminPage: React.FC = () => {
         onClose={closeDrawer}
         footer={
           <>
-            <SecondaryButton onClick={closeDrawer}>Cancel</SecondaryButton>
-            <PrimaryButton onClick={save} disabled={!draft?.title.trim()}>
-              Save
+            <SecondaryButton onClick={closeDrawer} disabled={isSaving}>
+              Cancel
+            </SecondaryButton>
+            <PrimaryButton onClick={save} disabled={!draft?.title.trim() || isSaving}>
+              {isSaving ? 'Saving...' : 'Save'}
             </PrimaryButton>
           </>
         }
@@ -105,28 +163,25 @@ const DailyCodingAdminPage: React.FC = () => {
         {draft && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <FormField label="Day">
+              <FormField label="Day #">
                 <TextInput type="number" value={draft.day} onChange={(e) => setDraft({ ...draft, day: Number(e.target.value) })} />
               </FormField>
               <FormField label="Difficulty">
                 <Select value={draft.difficulty} onChange={(e) => setDraft({ ...draft, difficulty: e.target.value as Difficulty })}>
-                  <option>Beginner</option>
-                  <option>Intermediate</option>
-                  <option>Advanced</option>
+                  <option value="Beginner">Beginner</option>
+                  <option value="Intermediate">Intermediate</option>
+                  <option value="Advanced">Advanced</option>
                 </Select>
               </FormField>
             </div>
-            <FormField label="Title">
+            <FormField label="Challenge Title">
               <TextInput value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
             </FormField>
-            <FormField label="Topic">
-              <TextInput value={draft.topic} onChange={(e) => setDraft({ ...draft, topic: e.target.value })} />
-            </FormField>
-            <FormField label="Tags" hint="Comma-separated">
-              <TextInput value={draft.tags.join(', ')} onChange={(e) => setDraft({ ...draft, tags: e.target.value.split(',').map((t) => t.trim()).filter(Boolean) })} />
+            <FormField label="Topic / Concept">
+              <TextInput value={draft.topic} onChange={(e) => setDraft({ ...draft, topic: e.target.value })} placeholder="e.g. Array Manipulation" />
             </FormField>
             <FormField label="Problem Statement">
-              <TextArea rows={3} value={draft.problemStatement} onChange={(e) => setDraft({ ...draft, problemStatement: e.target.value })} />
+              <TextArea rows={4} value={draft.problemStatement} onChange={(e) => setDraft({ ...draft, problemStatement: e.target.value })} />
             </FormField>
             <div className="grid grid-cols-2 gap-4">
               <FormField label="Example Input">
@@ -142,25 +197,22 @@ const DailyCodingAdminPage: React.FC = () => {
             <FormField label="Hints" hint="One per line">
               <TextArea rows={2} value={draft.hints.join('\n')} onChange={(e) => setDraft({ ...draft, hints: e.target.value.split('\n').filter(Boolean) })} />
             </FormField>
-            <div className="grid grid-cols-2 gap-4">
-              <FormField label="Total Test Cases">
-                <TextInput type="number" value={draft.testCasesTotal} onChange={(e) => setDraft({ ...draft, testCasesTotal: Number(e.target.value) })} />
-              </FormField>
-              <FormField label="Keyword Checks" hint="Comma-separated, used by the mock evaluator">
-                <TextInput value={draft.keywordChecks.join(', ')} onChange={(e) => setDraft({ ...draft, keywordChecks: e.target.value.split(',').map((t) => t.trim()).filter(Boolean) })} />
-              </FormField>
-            </div>
+            <FormField label="Total Test Cases">
+              <TextInput type="number" value={draft.testCasesTotal} onChange={(e) => setDraft({ ...draft, testCasesTotal: Number(e.target.value) })} />
+            </FormField>
           </div>
         )}
       </Drawer>
 
       <ConfirmDialog
         open={!!deleteTarget}
-        title={`Delete "${deleteTarget?.title}"?`}
+        title={`Delete Day ${deleteTarget?.day} challenge "${deleteTarget?.title}"?`}
         confirmLabel="Delete"
         danger
-        onConfirm={() => {
-          if (deleteTarget) contentRepo.deleteCodingQuestion(courseId, deleteTarget.id);
+        onConfirm={async () => {
+          if (deleteTarget) {
+            await deleteQuestionMutation.mutateAsync({ courseId, id: deleteTarget.id });
+          }
           setDeleteTarget(undefined);
         }}
         onCancel={() => setDeleteTarget(undefined)}

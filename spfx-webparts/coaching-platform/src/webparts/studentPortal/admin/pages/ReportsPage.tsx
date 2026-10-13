@@ -1,24 +1,30 @@
 import * as React from 'react';
-import { useState } from 'react';
-import { PageHeader, Card, SectionTitle } from '../../ui/Primitives';
+import { useState, useEffect } from 'react';
+import { PageHeader, Card, SectionTitle, LoadingState } from '../../ui/Primitives';
 import { AdminTable, AdminColumn, Select } from '../ui/AdminPrimitives';
-import * as courseRepo from '../repository/courseRepository';
-import * as rosterRepo from '../repository/rosterRepository';
-import * as progressRepository from '../repository/progressRepository';
 import * as progression from '../../state/engine/progression';
 import { ModuleDef, AssessmentDef } from '../../data/types';
 import { AssessmentAttemptRecord } from '../../state/types';
+import { useCourses, useCourseContent, useStudents, useProgressForCourse } from '../../hooks';
 
-// Fully repository-driven — never data/selectors or the mirrored "active"
+// Fully query-driven — never data/selectors or the mirrored "active"
 // course. Switching the course selector below switches every number on this
 // page to that course's own content and its own enrolled students' progress;
 // nothing here can leak MERN statistics into another course's report.
 const ReportsPage: React.FC = () => {
-  const courses = courseRepo.listCourses();
-  const [courseId, setCourseId] = useState(courses[0]?.id || '');
-  const content = courseRepo.getCourseContent(courseId);
-  const students = rosterRepo.listStudents().filter((s) => s.courseId === courseId);
-  const courseProgress = progressRepository.getProgressForCourse(courseId);
+  const { data: courses = [], isLoading: isLoadingCourses } = useCourses();
+  const [courseId, setCourseId] = useState('');
+
+  useEffect(() => {
+    if (!courseId && courses.length > 0) {
+      setCourseId(courses[0].id);
+    }
+  }, [courses, courseId]);
+
+  const { data: content, isLoading: isLoadingContent } = useCourseContent(courseId);
+  const { data: allStudents = [], isLoading: isLoadingStudents } = useStudents();
+  const students = allStudents.filter((s) => s.courseId === courseId);
+  const { data: courseProgress = [], isLoading: isLoadingProgress } = useProgressForCourse(courseId);
   const enrolledCount = Math.max(courseProgress.length, 1);
 
   const moduleColumns: AdminColumn<ModuleDef>[] = [
@@ -77,6 +83,10 @@ const ReportsPage: React.FC = () => {
   const attemptedDays = courseProgress.reduce((sum, p) => sum + Object.keys(p.coding).filter((id) => p.coding[id].attempts.length > 0).length, 0);
   const avgCurrentStreak = courseProgress.length > 0 ? Math.round(courseProgress.reduce((sum, p) => sum + p.codingStreak.current, 0) / enrolledCount) : 0;
   const bestStreak = courseProgress.reduce((max, p) => Math.max(max, p.codingStreak.best), 0);
+
+  if (isLoadingCourses || (courseId && (isLoadingContent || isLoadingStudents || isLoadingProgress))) {
+    return <LoadingState label="Loading reports..." />;
+  }
 
   return (
     <div>

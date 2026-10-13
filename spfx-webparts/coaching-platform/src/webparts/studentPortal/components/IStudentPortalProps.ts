@@ -3,4 +3,6 @@ export interface IStudentPortalProps {
   isDarkTheme: boolean;
   environmentMessage: string;
   userDisplayName: string;
+  userEmail?: string;
+  userLoginName?: string;
 }

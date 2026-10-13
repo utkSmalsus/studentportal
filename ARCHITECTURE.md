@@ -125,9 +125,9 @@ Create Course → open Course Builder → add Modules/Topics → attach Assessme
 
 ## K.0 Backend Store: SharePoint (Lists + Document Libraries)
 
-Decision: **SharePoint Online is the persistence layer.** Each entity below maps to a SharePoint List; relationships use Lookup columns; file-bearing entities (Submissions, Certificates) use a Document Library instead of a list attachment. Access is via **Microsoft Graph API** from a thin Node/Azure Functions API layer — SharePoint is never called directly from the frontend.
+Decision: **SharePoint Online is the persistence layer.** Each entity below maps to a SharePoint List; relationships use Lookup columns; file-bearing entities (Submissions, Certificates) use a Document Library instead of a list attachment. Access is via **PnPjs (SharePoint REST API)** directly from the SPFx web part — leveraging the user's native SharePoint context. No separate middle-tier API server is required for core operations.
 
-Why this still fits the architecture: the Engine layer (section A) talks to a `Repository` interface (`getCourse`, `saveSubmission`, `updateProgress`...). Today that interface is implemented with Graph API calls against Lists; nothing above it changes if you ever swap the implementation to Postgres. This keeps the "not built specifically around one backend" principle intact — same principle you're applying to MERN vs SPFx, just one layer down.
+Why this still fits the architecture: the Engine layer (section A) talks to a `Repository` interface (`getCourse`, `saveSubmission`, `updateProgress`...). Today that interface is implemented with PnPjs calls against Lists; nothing above it changes if you ever swap the implementation to Postgres. This keeps the "not built specifically around one backend" principle intact — same principle you're applying to MERN vs SPFx, just one layer down.
 
 **What you get for free**: no S3/storage abstraction needed — Document Libraries + Graph `/drive/items` already are the file store; versioning is built in (useful for mini-task resubmissions); Entra ID (Azure AD) gives you auth for free if the coaching center is on M365.
 
@@ -160,22 +160,20 @@ Why this still fits the architecture: the Engine layer (section A) talks to a `R
 
 Files referenced by URL/key only (`fileUrl`), actual bytes live in the Document Library (Graph `driveItem` id + webUrl), not in the list item itself.
 
-## L. API Architecture (major groups, REST-style — your API, backed by Graph API calls to SharePoint, never exposed directly to frontend)
+## L. API Architecture (SPFx Direct Repository Layer)
 
-- `POST /auth/login`, `/auth/me`
-- `/admin/courses`, `/admin/courses/:id/journey` (builder CRUD + reorder)
-- `/admin/questions` (bank CRUD), `/admin/daily-schedules`
-- `/admin/batches`, `/admin/enrollments`
-- `/admin/assessments`, `/admin/mini-tasks`, `/admin/projects`
-- `/admin/evaluations` (queue, submit evaluation)
-- `/admin/reports/*`
-- `/student/journey`, `/student/progress`
-- `/student/assessments/:id/attempt`
-- `/student/daily-challenge`, `/student/submissions`
-- `/student/mini-tasks/:id/submit`, `/student/projects/:id/submit`
-- `/student/certificates`, `/student/profile`
+Instead of a separate REST API server, the "API" is the collection of asynchronous functions exposed by the `admin/repository/` layer in the SPFx webpart. These functions use PnPjs to interact with SharePoint:
 
-All scoped by role/JWT; instructor endpoints filtered by assigned batches server-side.
+- `authRepository`: Gets the current SPFx context user and their role.
+- `courseRepository`: Builder CRUD + reorder via SP Lists.
+- `questionBankRepository` / `scheduleRepository`: Daily schedules and questions.
+- `rosterRepository`: Batches, enrollments.
+- `assessmentRepository` / `taskRepository`: Mini-tasks, projects.
+- `evaluationRepository`: Queue, submit evaluation.
+- `progressRepository`: Student journey and progress tracking.
+- `submissionRepository`: Handles file uploads to Document Libraries and records to Lists.
+
+All operations run in the context of the logged-in SharePoint user, with logic enforced inside the repository layer before the PnPjs call is made.
 
 ## M. Folder Structure
 
@@ -194,15 +192,17 @@ backend/
     server.ts
 frontend/
   src/
-    portals/
-      student/ (pages: Dashboard, Journey, Task, Assessment, Profile...)
-      admin/   (pages: CourseBuilder, Batches, EvaluationQueue, Reports...)
-    components/ (shared: JourneyMap, ProgressBar, EvaluationForm, DataTable)
-    api/ (typed client per module)
-    store/ (only where needed — auth, current user)
+    webparts/studentPortal/
+      portals/
+        student/ (pages: Dashboard, Journey, Task, Assessment, Profile...)
+        admin/   (pages: CourseBuilder, Batches, EvaluationQueue, Reports...)
+      components/ (shared: JourneyMap, ProgressBar, EvaluationForm, DataTable)
+      hooks/      (React hooks wrapping repository calls for async data fetching)
+      admin/repository/ (The "Backend" - PnPjs implementations mapping to SP Lists)
+      state/      (Context providers for current user and global UI state)
 ```
 
-Backend organized by **domain module**, not by MVC layer — each module owns its routes/service/model, so "add Python" never touches this tree at all (it's pure data).
+The application is purely a client-side SPFx webpart. The "Backend" is logically separated into the `repository/` folder, ensuring the UI components never directly construct SharePoint REST calls.
 
 ## N. MVP vs Phase 2 vs Future
 
@@ -222,8 +222,9 @@ Backend organized by **domain module**, not by MVC layer — each module owns it
 
 ## Answering your specific technical concerns
 
-- **Backend store = SharePoint** (see K.0): Lists for entities, Document Libraries for files, Graph API as the only access path, business logic kept out of Power Automate and inside your API layer. This is a valid choice given the domain (mostly read-heavy CRUD, not high-write-throughput transactional workloads) as long as the indexed-column and denormalized-progress mitigations above are in place from day one, not retrofitted.
-- **File storage**: solved by Document Libraries directly — no separate storage abstraction needed, Graph API already gives you upload/versioning/URL.
+- **Backend store = SharePoint** (see K.0): Lists for entities, Document Libraries for files. Business logic is kept inside the SPFx repository layer, not Power Automate. We are using **SPFx Direct (PnPjs)** rather than a middle-tier Node API, which reduces infrastructure overhead while maintaining architectural purity via the repository pattern.
+- **File storage**: Solved by Document Libraries directly — the SPFx web part will upload `File` objects directly to the library and store the resulting URL in the list item.
+- **Frontend Asynchronous Model**: To support the network calls to SharePoint, the UI components will use custom React Hooks (e.g., `useCourses`) powered by a data-fetching library (like React Query). This handles loading states gracefully without cluttering the UI with `useEffect`.
 
 ---
 

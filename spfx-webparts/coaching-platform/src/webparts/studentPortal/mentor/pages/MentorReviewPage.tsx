@@ -1,100 +1,178 @@
 import * as React from 'react';
 import { useState } from 'react';
-import { PageHeader, Card, SectionTitle, PrimaryButton, SecondaryButton } from '../../ui/Primitives';
+import { PageHeader, Card, SectionTitle, PrimaryButton, SecondaryButton, LoadingState } from '../../ui/Primitives';
 import { AdminTable, AdminColumn, StatusBadge, Drawer, FormField, TextArea } from '../../admin/ui/AdminPrimitives';
 import { SemanticColor } from '../../ui/statusMeta';
-import * as mentorRepo from '../../admin/repository/mentorRepository';
-import * as courseRepo from '../../admin/repository/courseRepository';
-import * as submissionRepo from '../../admin/repository/submissionRepository';
-import * as projectSubmissionRepo from '../../admin/repository/projectSubmissionRepository';
 import { EvaluationStatus } from '../../admin/types';
+import { useMentorReviewQueue, useCourseContent, useProjectSubmissions, useEvaluateSubmission, useEvaluateProjectSubmission, MentorReviewQueueItem } from '../../hooks';
 
 const statusColor: Record<EvaluationStatus, SemanticColor> = { 'Under Review': 'amber', 'Changes Requested': 'amber', Passed: 'green' };
 
-interface QueueRow {
-  id: string;
-  kind: 'miniTask' | 'project';
-  studentId: string;
-  courseId: string;
-  studentName: string;
-  courseTitle: string;
-  moduleTitle: string;
-  title: string;
-  submittedAt: string;
-  status: EvaluationStatus;
-  attempt: number;
-  githubUrl?: string;
-  githubBranch?: string;
-  commitSha?: string;
-  pullRequestUrl?: string;
-  liveUrl?: string;
-  documentationUrl?: string;
-  notes?: string;
-  taskId?: string;
+interface MentorReviewDrawerContentProps {
+  item: MentorReviewQueueItem;
+  onClose: () => void;
 }
 
-const MentorReviewPage: React.FC<{ mentorId: string }> = ({ mentorId }) => {
-  const myStudents = mentorRepo.getStudentsForMentor(mentorId);
-  const courses = courseRepo.listCourses();
-  const [tab, setTab] = useState<'miniTask' | 'project'>('miniTask');
-  const [open, setOpen] = useState<QueueRow | undefined>();
+const MentorReviewDrawerContent: React.FC<MentorReviewDrawerContentProps> = ({ item, onClose }) => {
+  const { data: content, isLoading: isContentLoading } = useCourseContent(item.courseId);
+  const { data: projectSubmissions } = useProjectSubmissions(item.kind === 'project' ? item.studentId : '', item.courseId);
+  const { mutate: evaluateMiniTask, isLoading: isEvaluatingMiniTask } = useEvaluateSubmission();
+  const { mutate: evaluateProject, isLoading: isEvaluatingProject } = useEvaluateProjectSubmission();
+
   const [feedback, setFeedback] = useState('');
   const [scores, setScores] = useState<Record<string, number>>({});
 
-  const miniTaskRows: QueueRow[] = myStudents.reduce<QueueRow[]>((rows, s) => {
-    const content = courseRepo.getCourseContent(s.courseId);
-    return rows.concat(submissionRepo.listPendingSubmissions([s.id], s.courseId).map((sub) => ({
-      id: sub.id,
-      kind: 'miniTask' as const,
-      studentId: sub.studentId,
-      courseId: sub.courseId,
-      studentName: s.name,
-      courseTitle: courses.find((c) => c.id === s.courseId)?.title || '',
-      moduleTitle: content?.moduleDefs.find((m) => m.id === sub.moduleId)?.title || '',
-      title: content?.miniTasks.find((t) => t.id === sub.taskId)?.title || sub.taskId,
-      submittedAt: sub.submittedAt,
-      status: sub.status as EvaluationStatus,
-      attempt: sub.attempt,
-      githubUrl: sub.repositoryName ? `https://github.com/${sub.repositoryName}` : undefined,
-      githubBranch: sub.branch,
-      commitSha: sub.commitSha,
-      pullRequestUrl: sub.pullRequestUrl,
-      liveUrl: sub.liveUrl,
-      notes: sub.notes,
-      taskId: sub.taskId,
-    })));
-  }, []);
+  const isSaving = isEvaluatingMiniTask || isEvaluatingProject;
 
-  const projectRows: QueueRow[] = myStudents.reduce<QueueRow[]>((rows, s) => {
-    const content = courseRepo.getCourseContent(s.courseId);
-    const submission = projectSubmissionRepo.getProjectSubmission(s.id, s.courseId);
-    if (!content || !submission || ['Under Review', 'Submitted', 'Resubmitted'].indexOf(submission.status) === -1) return rows;
-    return rows.concat([
-      {
-        id: submission.id,
-        kind: 'project' as const,
-        studentId: submission.studentId,
-        courseId: submission.courseId,
-        studentName: s.name,
-        courseTitle: courses.find((c) => c.id === s.courseId)?.title || '',
-        moduleTitle: content.moduleDefs.find((m) => m.id === content.majorProject.moduleId)?.title || content.majorProject.title,
-        title: content.majorProject.title,
-        submittedAt: submission.submittedAt,
-        status: submission.status as EvaluationStatus,
-        attempt: submission.attempt,
-        githubUrl: submission.repositoryName ? `https://github.com/${submission.repositoryName}` : undefined,
-        githubBranch: submission.branch,
-        commitSha: submission.commitSha,
-        pullRequestUrl: submission.pullRequestUrl,
-        liveUrl: submission.liveUrl,
-        documentationUrl: submission.documentationUrl,
-      },
-    ]);
-  }, []);
+  const openTaskDef = item.kind === 'miniTask' && item.taskId ? content?.miniTasks.find((t) => t.id === item.taskId) : undefined;
+  const openEvaluationCriteria = openTaskDef
+    ? openTaskDef.evaluationCriteriaTemplate
+    : item.kind === 'project'
+    ? content?.majorProject.evaluationCriteriaTemplate
+    : undefined;
+  const previousAttempt =
+    item.kind === 'project' && item.attempt > 1
+      ? projectSubmissions?.find((s) => s.attempt === item.attempt - 1)
+      : undefined;
 
-  const rows = tab === 'miniTask' ? miniTaskRows : projectRows;
+  const submitOutcome = (outcome: EvaluationStatus): void => {
+    const criteria = (openEvaluationCriteria || []).map((c) => ({
+      label: c.label,
+      score: scores[c.label] ?? Math.round(c.maxScore * 0.8),
+      maxScore: c.maxScore,
+    }));
+    const resolvedOutcome = outcome === 'Passed' ? 'Passed' : 'Changes Requested';
 
-  const columns: AdminColumn<QueueRow>[] = [
+    if (item.kind === 'miniTask' && item.taskId) {
+      evaluateMiniTask(
+        { studentId: item.studentId, courseId: item.courseId, taskId: item.taskId, attempt: item.attempt, input: { criteria, feedback, outcome: resolvedOutcome } },
+        { onSuccess: onClose }
+      );
+    } else {
+      evaluateProject(
+        { studentId: item.studentId, courseId: item.courseId, attempt: item.attempt, input: { criteria, feedback, outcome: resolvedOutcome } },
+        { onSuccess: onClose }
+      );
+    }
+  };
+
+  if (isContentLoading) {
+    return <LoadingState label="Loading details..." />;
+  }
+
+  return (
+    <div className="space-y-5">
+      <Card>
+        <SectionTitle>GitHub &amp; Submission</SectionTitle>
+        <div className="text-sm space-y-1.5">
+          {item.githubUrl && (
+            <div>
+              <span className="text-slate-400">Repository: </span>
+              <a href={item.githubUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 font-medium hover:underline">
+                {item.githubUrl}
+              </a>
+            </div>
+          )}
+          {item.githubBranch && (
+            <div>
+              <span className="text-slate-400">Branch: </span>
+              {item.githubBranch}
+            </div>
+          )}
+          {item.commitSha && (
+            <div>
+              <span className="text-slate-400">Commit: </span>
+              <span className="font-mono text-xs">{item.commitSha}</span>
+            </div>
+          )}
+          {item.pullRequestUrl && (
+            <div>
+              <span className="text-slate-400">Pull Request: </span>
+              <a href={item.pullRequestUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 font-medium hover:underline">
+                {item.pullRequestUrl}
+              </a>
+            </div>
+          )}
+          {item.liveUrl && (
+            <div>
+              <span className="text-slate-400">Live: </span>
+              <a href={item.liveUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 font-medium hover:underline">
+                {item.liveUrl}
+              </a>
+            </div>
+          )}
+          {item.documentationUrl && (
+            <div>
+              <span className="text-slate-400">Documentation: </span>
+              <a href={item.documentationUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 font-medium hover:underline">
+                {item.documentationUrl}
+              </a>
+            </div>
+          )}
+          {item.notes && (
+            <div>
+              <span className="text-slate-400">Notes: </span>
+              {item.notes}
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {previousAttempt?.evaluation && (
+        <Card>
+          <SectionTitle>Previous Attempt (#{previousAttempt.attempt})</SectionTitle>
+          <p className="text-sm text-amber-700 mb-2">{previousAttempt.evaluation.outcome === 'Changes Requested' ? 'Changes were requested:' : 'Previously passed, but a new attempt was submitted:'}</p>
+          <p className="text-sm text-slate-700">{previousAttempt.evaluation.feedback}</p>
+        </Card>
+      )}
+
+      {openEvaluationCriteria && (
+        <Card>
+          <SectionTitle>Scorecard</SectionTitle>
+          <div className="space-y-3">
+            {openEvaluationCriteria.map((c) => (
+              <div key={c.label} className="flex items-center justify-between gap-3">
+                <span className="text-sm font-medium text-slate-700">{c.label}</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={c.maxScore}
+                  value={scores[c.label] ?? Math.round(c.maxScore * 0.8)}
+                  onChange={(e) => setScores({ ...scores, [c.label]: Number(e.target.value) })}
+                  className="w-20 border border-slate-300 rounded-lg px-2 py-1.5 text-sm text-right"
+                  disabled={isSaving}
+                />
+                <span className="text-xs text-slate-400 w-10">/ {c.maxScore}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      <FormField label="Overall Feedback">
+        <TextArea rows={4} value={feedback} onChange={(e) => setFeedback(e.target.value)} placeholder="What did they do well? What needs to change?" disabled={isSaving} />
+      </FormField>
+
+      <div className="flex items-center gap-2">
+        <SecondaryButton onClick={() => submitOutcome('Changes Requested')} disabled={!feedback.trim() || isSaving}>
+          Request Changes
+        </SecondaryButton>
+        <PrimaryButton onClick={() => submitOutcome('Passed')} disabled={isSaving}>
+          {isSaving ? 'Saving...' : 'Mark Passed'}
+        </PrimaryButton>
+      </div>
+    </div>
+  );
+};
+
+const MentorReviewPage: React.FC<{ mentorId: string }> = ({ mentorId }) => {
+  const { data: queue, isLoading } = useMentorReviewQueue(mentorId);
+  const [tab, setTab] = useState<'miniTask' | 'project'>('miniTask');
+  const [open, setOpen] = useState<MentorReviewQueueItem | undefined>();
+
+  const rows = (tab === 'miniTask' ? queue?.miniTasks : queue?.projects) || [];
+
+  const columns: AdminColumn<MentorReviewQueueItem>[] = [
     { key: 'student', label: 'Student', render: (r) => r.studentName },
     { key: 'course', label: 'Course', render: (r) => r.courseTitle },
     { key: 'module', label: 'Module', render: (r) => r.moduleTitle },
@@ -104,36 +182,13 @@ const MentorReviewPage: React.FC<{ mentorId: string }> = ({ mentorId }) => {
     { key: 'status', label: 'Status', render: (r) => <StatusBadge color={statusColor[r.status]}>{r.status}</StatusBadge> },
   ];
 
-  const openTaskDef = open?.kind === 'miniTask' && open.taskId ? courseRepo.getCourseContent(open.courseId)?.miniTasks.find((t) => t.id === open.taskId) : undefined;
-  const openEvaluationCriteria = openTaskDef
-    ? openTaskDef.evaluationCriteriaTemplate
-    : open?.kind === 'project'
-    ? courseRepo.getCourseContent(open.courseId)?.majorProject.evaluationCriteriaTemplate
-    : undefined;
-  // The attempt right before the one being reviewed — evaluating the open
-  // attempt only ever writes to that attempt's own version, never this one.
-  const previousAttempt =
-    open?.kind === 'project' && open.attempt > 1
-      ? projectSubmissionRepo.listProjectSubmissions(open.studentId, open.courseId).find((s) => s.attempt === open.attempt - 1)
-      : undefined;
-
-  const openRow = (row: QueueRow): void => {
+  const openRow = (row: MentorReviewQueueItem): void => {
     setOpen(row);
-    setFeedback('');
-    setScores({});
   };
 
-  const submitOutcome = (outcome: EvaluationStatus): void => {
-    if (!open) return;
-    const criteria = (openEvaluationCriteria || []).map((c) => ({ label: c.label, score: scores[c.label] ?? Math.round(c.maxScore * 0.8), maxScore: c.maxScore }));
-    const resolvedOutcome = outcome === 'Passed' ? 'Passed' : 'Changes Requested';
-    if (open.kind === 'miniTask' && open.taskId) {
-      submissionRepo.evaluateSubmission(open.studentId, open.courseId, open.taskId, open.attempt, { criteria, feedback, outcome: resolvedOutcome });
-    } else {
-      projectSubmissionRepo.evaluateProjectSubmission(open.studentId, open.courseId, open.attempt, { criteria, feedback, outcome: resolvedOutcome });
-    }
-    setOpen(undefined);
-  };
+  if (isLoading) {
+    return <LoadingState label="Loading review queue..." />;
+  }
 
   return (
     <div>
@@ -154,109 +209,7 @@ const MentorReviewPage: React.FC<{ mentorId: string }> = ({ mentorId }) => {
       <AdminTable columns={columns} rows={rows} rowKey={(r) => r.id} onRowClick={openRow} emptyLabel="Nothing pending review." />
 
       <Drawer open={!!open} title={open?.title || ''} subtitle={open ? `${open.studentName} · Attempt ${open.attempt}` : ''} wide onClose={() => setOpen(undefined)}>
-        {open && (
-          <div className="space-y-5">
-            <Card>
-              <SectionTitle>GitHub &amp; Submission</SectionTitle>
-              <div className="text-sm space-y-1.5">
-                {open.githubUrl && (
-                  <div>
-                    <span className="text-slate-400">Repository: </span>
-                    <a href={open.githubUrl} target="_blank" rel="noreferrer" className="text-indigo-600 font-medium hover:underline">
-                      {open.githubUrl}
-                    </a>
-                  </div>
-                )}
-                {open.githubBranch && (
-                  <div>
-                    <span className="text-slate-400">Branch: </span>
-                    {open.githubBranch}
-                  </div>
-                )}
-                {open.commitSha && (
-                  <div>
-                    <span className="text-slate-400">Commit: </span>
-                    <span className="font-mono text-xs">{open.commitSha}</span>
-                  </div>
-                )}
-                {open.pullRequestUrl && (
-                  <div>
-                    <span className="text-slate-400">Pull Request: </span>
-                    <a href={open.pullRequestUrl} target="_blank" rel="noreferrer" className="text-indigo-600 font-medium hover:underline">
-                      {open.pullRequestUrl}
-                    </a>
-                  </div>
-                )}
-                {open.liveUrl && (
-                  <div>
-                    <span className="text-slate-400">Live: </span>
-                    <a href={open.liveUrl} target="_blank" rel="noreferrer" className="text-indigo-600 font-medium hover:underline">
-                      {open.liveUrl}
-                    </a>
-                  </div>
-                )}
-                {open.documentationUrl && (
-                  <div>
-                    <span className="text-slate-400">Documentation: </span>
-                    <a href={open.documentationUrl} target="_blank" rel="noreferrer" className="text-indigo-600 font-medium hover:underline">
-                      {open.documentationUrl}
-                    </a>
-                  </div>
-                )}
-                {open.notes && (
-                  <div>
-                    <span className="text-slate-400">Notes: </span>
-                    {open.notes}
-                  </div>
-                )}
-              </div>
-              <p className="text-xs text-slate-400 mt-3 pt-3 border-t border-slate-100">
-                Open the repository to review the actual code before scoring — a commit existing is evidence of activity, not completion.
-              </p>
-            </Card>
-
-            {previousAttempt?.evaluation && (
-              <Card>
-                <SectionTitle>Previous Attempt (#{previousAttempt.attempt})</SectionTitle>
-                <p className="text-sm text-amber-700 mb-2">{previousAttempt.evaluation.outcome === 'Changes Requested' ? 'Changes were requested:' : 'Previously passed, but a new attempt was submitted:'}</p>
-                <p className="text-sm text-slate-700">{previousAttempt.evaluation.feedback}</p>
-              </Card>
-            )}
-
-            {openEvaluationCriteria && (
-              <Card>
-                <SectionTitle>Scorecard</SectionTitle>
-                <div className="space-y-3">
-                  {openEvaluationCriteria.map((c) => (
-                    <div key={c.label} className="flex items-center justify-between gap-3">
-                      <span className="text-sm font-medium text-slate-700">{c.label}</span>
-                      <input
-                        type="number"
-                        min={0}
-                        max={c.maxScore}
-                        value={scores[c.label] ?? Math.round(c.maxScore * 0.8)}
-                        onChange={(e) => setScores({ ...scores, [c.label]: Number(e.target.value) })}
-                        className="w-20 border border-slate-300 rounded-lg px-2 py-1.5 text-sm text-right"
-                      />
-                      <span className="text-xs text-slate-400 w-10">/ {c.maxScore}</span>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            )}
-
-            <FormField label="Overall Feedback">
-              <TextArea rows={4} value={feedback} onChange={(e) => setFeedback(e.target.value)} placeholder="What did they do well? What needs to change?" />
-            </FormField>
-
-            <div className="flex items-center gap-2">
-              <SecondaryButton onClick={() => submitOutcome('Changes Requested')} disabled={!feedback.trim()}>
-                Request Changes
-              </SecondaryButton>
-              <PrimaryButton onClick={() => submitOutcome('Passed')}>Mark Passed</PrimaryButton>
-            </div>
-          </div>
-        )}
+        {open && <MentorReviewDrawerContent item={open} onClose={() => setOpen(undefined)} />}
       </Drawer>
     </div>
   );

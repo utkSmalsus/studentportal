@@ -1,10 +1,20 @@
 import * as React from 'react';
-import { PageHeader, Card, SectionTitle } from '../../ui/Primitives';
+import { PageHeader, Card, SectionTitle, LoadingState } from '../../ui/Primitives';
 import { Checkbox } from '../ui/AdminPrimitives';
-import * as settingsRepo from '../repository/settingsRepository';
+import { useNotificationRules, useToggleNotificationRule } from '../../hooks';
 
 const NotificationsAdminPage: React.FC = () => {
-  const rules = settingsRepo.listNotificationRules();
+  const { data: rules = [], isLoading } = useNotificationRules();
+  const toggleMutation = useToggleNotificationRule();
+
+  if (isLoading) {
+    return (
+      <div>
+        <PageHeader eyebrow="System" title="Notifications" subtitle="Which platform events generate a notification." />
+        <LoadingState label="Loading notification rules..." />
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -13,7 +23,12 @@ const NotificationsAdminPage: React.FC = () => {
         <SectionTitle>Notification Rules</SectionTitle>
         <div className="space-y-3">
           {rules.map((r) => (
-            <Checkbox key={r.id} label={r.description} checked={r.enabled} onChange={(v) => settingsRepo.toggleNotificationRule(r.id, v)} />
+            <Checkbox
+              key={r.id}
+              label={r.description}
+              checked={r.enabled}
+              onChange={(v) => toggleMutation.mutate({ id: r.id, enabled: v })}
+            />
           ))}
         </div>
       </Card>

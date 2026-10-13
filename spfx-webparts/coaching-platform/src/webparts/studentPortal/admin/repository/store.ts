@@ -719,6 +719,63 @@ export function commit(mutatedCourseId?: string): void {
   listeners.forEach((l) => l());
 }
 
+// Loads real data from SharePoint Online lists if available, merging it into the local store
+export async function syncFromSharePoint(): Promise<void> {
+  try {
+    const {
+      fetchCoursesFromSP,
+      fetchStudentsFromSP,
+      fetchBatchesFromSP,
+      fetchMentorsFromSP,
+      fetchEnrollmentsFromSP,
+      fetchCertificatesFromSP,
+    } = await import('../../services/spDataService');
+
+    const [courses, students, batches, mentors, enrollments, certs] = await Promise.all([
+      fetchCoursesFromSP(),
+      fetchStudentsFromSP(),
+      fetchBatchesFromSP(),
+      fetchMentorsFromSP(),
+      fetchEnrollmentsFromSP(),
+      fetchCertificatesFromSP(),
+    ]);
+
+    let changed = false;
+    if (courses) {
+      Object.assign(state.courses, courses);
+      changed = true;
+    }
+    if (students) {
+      state.students = students;
+      changed = true;
+    }
+    if (batches) {
+      state.batches = batches;
+      changed = true;
+    }
+    if (mentors) {
+      state.mentors = mentors;
+      changed = true;
+    }
+    if (enrollments) {
+      state.enrollments = enrollments;
+      changed = true;
+    }
+    if (certs) {
+      state.certificates = certs;
+      changed = true;
+    }
+
+    if (changed) {
+      syncActiveCourseToMockData();
+      save();
+      listeners.forEach((l) => l());
+    }
+  } catch (err) {
+    console.warn('[store] Could not sync from SharePoint:', err);
+  }
+}
+
 // Make sure mockData reflects whatever course is active right now (covers the
 // very first load, where courses['mern'] was cloned FROM mockData so the two
 // already agree — this only matters after a localStorage restore where the

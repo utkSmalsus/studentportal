@@ -1,13 +1,19 @@
 import * as React from 'react';
 import { useState } from 'react';
-import { PageHeader, PrimaryButton, SecondaryButton } from '../../ui/Primitives';
+import { PageHeader, PrimaryButton, SecondaryButton, LoadingState } from '../../ui/Primitives';
 import { AdminTable, AdminColumn, StatusBadge, Drawer, FormField, Select, TextInput } from '../ui/AdminPrimitives';
 import { PlusIcon } from '../../ui/icons';
 import { SemanticColor } from '../../ui/statusMeta';
-import * as courseRepo from '../repository/courseRepository';
-import * as rosterRepo from '../repository/rosterRepository';
-import { getStudentProgressView } from '../repository/progressView';
 import { StudentRecord, StudentStatus } from '../types';
+import {
+  useStudents,
+  useCourses,
+  useBatches,
+  useStudentProgressView,
+  useCreateStudent,
+  useUpdateStudent,
+  useEnrollStudent,
+} from '../../hooks';
 
 const statusColor: Record<StudentStatus, SemanticColor> = { active: 'green', paused: 'amber', completed: 'blue', dropped: 'red' };
 
@@ -19,38 +25,105 @@ interface NewStudentDraft {
   enrollmentDate: string;
 }
 
+const StudentProgressCell: React.FC<{ studentId: string; courseId: string }> = ({ studentId, courseId }) => {
+  const { data: view, isLoading } = useStudentProgressView(studentId, courseId);
+  if (isLoading) return <span className="text-xs text-slate-400">...</span>;
+  return <span>{view?.overallPercent ?? 0}%</span>;
+};
+
+const StudentProgressDetails: React.FC<{ studentId: string; courseId: string; isLiveDemoStudent?: boolean }> = ({
+  studentId,
+  courseId,
+  isLiveDemoStudent,
+}) => {
+  const { data: view, isLoading } = useStudentProgressView(studentId, courseId);
+  if (isLoading) return <div className="text-xs text-slate-400 py-2">Loading progress details...</div>;
+  if (!view) return null;
+  return (
+    <div className="pt-3 border-t border-slate-100">
+      {isLiveDemoStudent && (
+        <p className="text-xs text-slate-400 mb-2">
+          This is the live demo student — their journey, submissions and assessments are the real, shared app state.
+        </p>
+      )}
+      <div className="text-sm space-y-1.5">
+        <div>Current progress: {view.overallPercent}%</div>
+        <div>Coding streak: {view.progress.codingStreak.current} days</div>
+        <div>
+          Mini tasks: {Object.keys(view.progress.miniTasks).filter((id) => view.progress.miniTasks[id].status === 'Passed').length} passed
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const StudentsPage: React.FC = () => {
-  const students = rosterRepo.listStudents();
-  const courses = courseRepo.listCourses();
-  const batches = rosterRepo.listBatches();
+  const { data: students = [], isLoading: studentsLoading } = useStudents();
+  const { data: courses = [], isLoading: coursesLoading } = useCourses();
+  const { data: batches = [], isLoading: batchesLoading } = useBatches();
+
+  const createStudentMutation = useCreateStudent();
+  const updateStudentMutation = useUpdateStudent();
+  const enrollStudentMutation = useEnrollStudent();
+
   const [selected, setSelected] = useState<StudentRecord | undefined>();
   const [creating, setCreating] = useState<NewStudentDraft | undefined>();
+
+  const isLoading = studentsLoading || coursesLoading || batchesLoading;
 
   const columns: AdminColumn<StudentRecord>[] = [
     { key: 'name', label: 'Name', render: (s) => <span className="font-semibold text-slate-900">{s.name}</span> },
     { key: 'email', label: 'Email', render: (s) => s.email },
     { key: 'course', label: 'Course', render: (s) => courses.find((c) => c.id === s.courseId)?.title || '—' },
     { key: 'batch', label: 'Batch', render: (s) => batches.find((b) => b.id === s.batchId)?.name || '—' },
-    { key: 'progress', label: 'Progress', render: (s) => `${getStudentProgressView(s.id, s.courseId)?.overallPercent ?? 0}%` },
+    {
+      key: 'progress',
+      label: 'Progress',
+      render: (s) => <StudentProgressCell studentId={s.id} courseId={s.courseId} />,
+    },
     { key: 'status', label: 'Status', render: (s) => <StatusBadge color={statusColor[s.status]}>{s.status}</StatusBadge> },
   ];
 
-  const selectedView = selected ? getStudentProgressView(selected.id, selected.courseId) : undefined;
-
-  const openCreate = (): void => setCreating({ name: '', email: '', courseId: courses[0]?.id || '', batchId: '', enrollmentDate: new Date().toISOString().slice(0, 10) });
-  const closeCreate = (): void => setCreating(undefined);
-  const handleCreate = (): void => {
-    if (!creating || !creating.name.trim() || !creating.email.trim() || !creating.courseId) return;
-    const student = rosterRepo.createStudent({
-      name: creating.name.trim(), email: creating.email.trim(), courseId: creating.courseId,
-      batchId: creating.batchId || undefined, enrollmentDate: creating.enrollmentDate, status: 'active',
+  const openCreate = (): void =>
+    setCreating({
+      name: '',
+      email: '',
+      courseId: courses[0]?.id || '',
+      batchId: '',
+      enrollmentDate: new Date().toISOString().slice(0, 10),
     });
-    rosterRepo.enrollStudent({
-      studentId: student.id, courseId: creating.courseId, batchId: creating.batchId || undefined,
-      startDate: creating.enrollmentDate, expectedCompletion: creating.enrollmentDate,
+  const closeCreate = (): void => setCreating(undefined);
+
+  const handleCreate = async (): Promise<void> => {
+    if (!creating || !creating.name.trim() || !creating.email.trim() || !creating.courseId) return;
+    const student = await createStudentMutation.mutateAsync({
+      name: creating.name.trim(),
+      email: creating.email.trim(),
+      courseId: creating.courseId,
+      batchId: creating.batchId || undefined,
+      enrollmentDate: creating.enrollmentDate,
+      status: 'active',
+    });
+    await enrollStudentMutation.mutateAsync({
+      studentId: student.id,
+      courseId: creating.courseId,
+      batchId: creating.batchId || undefined,
+      startDate: creating.enrollmentDate,
+      expectedCompletion: creating.enrollmentDate,
     });
     closeCreate();
   };
+
+  if (isLoading) {
+    return (
+      <div>
+        <PageHeader eyebrow="Students" title="Students" subtitle="Everyone enrolled across your courses." />
+        <LoadingState label="Loading students..." />
+      </div>
+    );
+  }
+
+  const isCreating = createStudentMutation.isLoading || enrollStudentMutation.isLoading;
 
   return (
     <div>
@@ -59,7 +132,7 @@ const StudentsPage: React.FC = () => {
         title="Students"
         subtitle="Everyone enrolled across your courses."
         action={
-          <PrimaryButton onClick={openCreate}>
+          <PrimaryButton onClick={openCreate} disabled={courses.length === 0}>
             <PlusIcon className="w-4 h-4" /> Create Student
           </PrimaryButton>
         }
@@ -70,7 +143,14 @@ const StudentsPage: React.FC = () => {
         {selected && (
           <div className="space-y-5">
             <FormField label="Status">
-              <Select value={selected.status} onChange={(e) => rosterRepo.updateStudent(selected.id, { status: e.target.value as StudentStatus })}>
+              <Select
+                value={selected.status}
+                onChange={(e) => {
+                  const newStatus = e.target.value as StudentStatus;
+                  setSelected({ ...selected, status: newStatus });
+                  updateStudentMutation.mutate({ id: selected.id, patch: { status: newStatus } });
+                }}
+              >
                 <option value="active">Active</option>
                 <option value="paused">Paused</option>
                 <option value="completed">Completed</option>
@@ -78,7 +158,14 @@ const StudentsPage: React.FC = () => {
               </Select>
             </FormField>
             <FormField label="Batch">
-              <Select value={selected.batchId || ''} onChange={(e) => rosterRepo.updateStudent(selected.id, { batchId: e.target.value || undefined })}>
+              <Select
+                value={selected.batchId || ''}
+                onChange={(e) => {
+                  const newBatchId = e.target.value || undefined;
+                  setSelected({ ...selected, batchId: newBatchId });
+                  updateStudentMutation.mutate({ id: selected.id, patch: { batchId: newBatchId } });
+                }}
+              >
                 <option value="">—</option>
                 {batches.filter((b) => b.courseId === selected.courseId).map((b) => (
                   <option key={b.id} value={b.id}>
@@ -90,18 +177,11 @@ const StudentsPage: React.FC = () => {
             <div className="text-sm text-slate-500">
               Enrolled {selected.enrollmentDate} &middot; Course: {courses.find((c) => c.id === selected.courseId)?.title || '—'}
             </div>
-            {selectedView && (
-              <div className="pt-3 border-t border-slate-100">
-                {selected.isLiveDemoStudent && (
-                  <p className="text-xs text-slate-400 mb-2">This is the live demo student — their journey, submissions and assessments are the real, shared app state.</p>
-                )}
-                <div className="text-sm space-y-1.5">
-                  <div>Current progress: {selectedView.overallPercent}%</div>
-                  <div>Coding streak: {selectedView.progress.codingStreak.current} days</div>
-                  <div>Mini tasks: {Object.keys(selectedView.progress.miniTasks).filter((id) => selectedView.progress.miniTasks[id].status === 'Passed').length} passed</div>
-                </div>
-              </div>
-            )}
+            <StudentProgressDetails
+              studentId={selected.id}
+              courseId={selected.courseId}
+              isLiveDemoStudent={selected.isLiveDemoStudent}
+            />
           </div>
         )}
       </Drawer>
@@ -112,9 +192,12 @@ const StudentsPage: React.FC = () => {
         onClose={closeCreate}
         footer={
           <>
-            <SecondaryButton onClick={closeCreate}>Cancel</SecondaryButton>
-            <PrimaryButton onClick={handleCreate} disabled={!creating?.name.trim() || !creating?.email.trim() || !creating?.courseId}>
-              Create &amp; Enroll
+            <SecondaryButton onClick={closeCreate} disabled={isCreating}>Cancel</SecondaryButton>
+            <PrimaryButton
+              onClick={handleCreate}
+              disabled={!creating?.name.trim() || !creating?.email.trim() || !creating?.courseId || isCreating}
+            >
+              {isCreating ? 'Creating...' : 'Create & Enroll'}
             </PrimaryButton>
           </>
         }

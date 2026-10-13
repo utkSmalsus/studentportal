@@ -1,8 +1,7 @@
 import * as React from 'react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { IStudentPortalProps } from './IStudentPortalProps';
 import { useAppState } from '../state/AppStateContext';
-import { useAdminStoreVersion } from '../admin/hooks';
 import NavShell from '../navigation/NavShell';
 import { Route } from '../navigation/types';
 import HomePage from './pages/HomePage';
@@ -22,14 +21,20 @@ import PerformancePage from './pages/PerformancePage';
 import CertificatesPage from './pages/CertificatesPage';
 import ProfilePage from './pages/ProfilePage';
 import OnboardingPage from './pages/OnboardingPage';
-import { course } from '../data/selectors';
-import * as rosterRepo from '../admin/repository/rosterRepository';
+import { useStudent, useCourseMeta } from '../hooks';
 
 export const StudentPortalShell: React.FC<IStudentPortalProps & { onOpenAdmin?: () => void }> = ({ userDisplayName, onOpenAdmin }) => {
-  useAdminStoreVersion();
-  const { studentId } = useAppState();
+  const { studentId, courseId } = useAppState();
+  const { data: student } = useStudent(studentId);
+  const { data: courseMeta } = useCourseMeta(courseId);
   const [route, setRoute] = useState<Route>({ view: 'home' });
-  const [onboarding, setOnboarding] = useState(() => rosterRepo.getStudent(studentId)?.onboardingComplete === false);
+  const [onboarding, setOnboarding] = useState(false);
+
+  useEffect(() => {
+    if (student && student.onboardingComplete === false) {
+      setOnboarding(true);
+    }
+  }, [student]);
 
   if (onboarding) {
     return <OnboardingPage studentId={studentId} onComplete={() => setOnboarding(false)} />;
@@ -68,14 +73,23 @@ export const StudentPortalShell: React.FC<IStudentPortalProps & { onOpenAdmin?: 
       case 'certificates':
         return <CertificatesPage />;
       case 'profile':
-        return <ProfilePage userDisplayName={userDisplayName} onRestartOnboarding={() => setOnboarding(true)} />;
+        return (
+          <ProfilePage
+            userDisplayName={userDisplayName}
+            onRestartOnboarding={
+              onOpenAdmin || student?.onboardingComplete === false
+                ? () => setOnboarding(true)
+                : undefined
+            }
+          />
+        );
       default:
         return null;
     }
   };
 
   return (
-    <NavShell route={route} onNavigate={setRoute} userDisplayName={userDisplayName} courseTitle={course.title} onOpenAdmin={onOpenAdmin}>
+    <NavShell route={route} onNavigate={setRoute} userDisplayName={userDisplayName} courseTitle={courseMeta?.title || 'Coaching Platform'} onOpenAdmin={onOpenAdmin}>
       {renderPage()}
     </NavShell>
   );
